@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/Icons";
 import { AiCoachFab, AiCoachPanel } from "@/components/AiCoachPanel";
+import { InstallButton, InstallPrompt, resetInstallDismissal } from "@/components/InstallPrompt";
 import { EmailReminders } from "@/components/EmailReminders";
 import { LogModal } from "@/components/LogModal";
 import { SourceBreakdown } from "@/components/SourceBreakdown";
@@ -41,6 +42,7 @@ export function SavingsTracker() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
+  const [installOpen, setInstallOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [historyFilter, setHistoryFilter] = useState<HistoryFilter>("all");
   const importRef = useRef<HTMLInputElement>(null);
@@ -106,10 +108,18 @@ export function SavingsTracker() {
             </span>
           </div>
         </div>
-        <button type="button" className="log-btn" onClick={() => setModalOpen(true)}>
-          <Icon name="plus" />
-          Log payday
-        </button>
+        <div className="topbar-actions">
+          <InstallButton
+            onClick={() => {
+              resetInstallDismissal();
+              setInstallOpen(true);
+            }}
+          />
+          <button type="button" className="log-btn" onClick={() => setModalOpen(true)}>
+            <Icon name="plus" />
+            Log payday
+          </button>
+        </div>
       </header>
 
       <div className="dashboard">
@@ -339,6 +349,7 @@ export function SavingsTracker() {
         </aside>
       </div>
 
+      <InstallPrompt forceShow={installOpen} />
       {modalOpen && <LogModal onClose={() => setModalOpen(false)} onSelect={handleLog} />}
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
       <AiCoachFab onOpen={() => setAiOpen(true)} />

@@ -75,6 +75,17 @@ body {
   margin-bottom: 28px;
 }
 
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.install-top-btn {
+  white-space: nowrap;
+}
+
 .brand {
   display: flex;
   align-items: center;
@@ -1473,4 +1484,78 @@ button.ics-btn:active {
 .ai-goal-amt {
   margin: 8px 0;
   font-size: 12px;
+}
+
+/* ---- PWA install prompt ---- */
+.install-prompt {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: 82px;
+  z-index: 45;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: var(--cream);
+  border: 3px solid var(--ink);
+  border-radius: 16px;
+  padding: 14px 14px 14px 16px;
+  box-shadow: 5px 5px 0 var(--ink);
+}
+
+.install-prompt-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  border: 2.5px solid var(--ink);
+  background: var(--cream);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 3px 3px 0 var(--ink);
+}
+
+.install-prompt-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.install-prompt-body strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.install-prompt-body p {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #4a4a48;
+}
+
+.install-dismiss {
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .install-prompt {
+    bottom: 76px;
+  }
+}
+
+@media (display-mode: standalone) {
+  .install-prompt {
+    display: none;
+  }
 }

@@ -18,11 +18,27 @@ export const metadata: Metadata = {
   title: "Savings Tracker",
   description: "Save first. Spend what's left. Track paydays and savings in birr and dollars.",
   applicationName: "Savings Tracker",
+  appleWebApp: {
+    capable: true,
+    title: "Savings",
+    statusBarStyle: "default",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  icons: {
+    icon: [
+      { url: "/brand/app-icon.svg", type: "image/svg+xml" },
+      { url: "/icon", sizes: "32x32", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-icon", sizes: "180x180", type: "image/png" }],
+  },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  viewportFit: "cover",
   themeColor: "#ededed",
 };
 
