@@ -109,6 +109,16 @@ export function SavingsTracker() {
           </div>
         </div>
         <div className="topbar-actions">
+          <button
+            type="button"
+            className="ghost-btn"
+            onClick={async () => {
+              await fetch("/api/auth/logout", { method: "POST" });
+              window.location.href = "/login";
+            }}
+          >
+            Sign out
+          </button>
           <InstallButton
             onClick={() => {
               resetInstallDismissal();

@@ -10,6 +10,7 @@
     "send-reminder": "node scripts/send-reminder.mjs"
   },
   "dependencies": {
+    "jose": "^6.2.12",
     "next": "^15.5.3",
     "nodemailer": "^10.0.8",
     "react": "^19.1.1",

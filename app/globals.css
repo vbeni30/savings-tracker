@@ -1559,3 +1559,99 @@ button.ics-btn:active {
     display: none;
   }
 }
+
+/* ---- Login ---- */
+.login-wrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 18px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--cream);
+  border: 3px solid var(--ink);
+  border-radius: 20px;
+  padding: 28px 24px 24px;
+  box-shadow: 7px 7px 0 var(--ink);
+}
+
+.login-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  border: 3px solid var(--ink);
+  background: var(--cream);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 4px 4px 0 var(--ink);
+  margin-bottom: 16px;
+}
+
+.login-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.login-card h1 {
+  margin: 0 0 6px;
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.login-sub {
+  margin: 0 0 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6b6754;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.login-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.login-form label span {
+  font-size: 11px;
+  font-weight: 800;
+  color: #5b5748;
+  letter-spacing: 0.03em;
+}
+
+.login-form input {
+  border: 2.5px solid var(--ink);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--bg);
+}
+
+.login-form input:focus {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+
+.login-error {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #8b2e2e;
+}
+
+.login-submit {
+  width: 100%;
+  margin-top: 4px;
+}
