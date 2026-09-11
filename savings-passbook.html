@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Savings Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #EDEDE9;
+    --cream: #FFFFFF;
+    --ink: #111111;
+    --purple: #0D0D0D;
+    --purple-tab: #000000;
+    --pink: #7A7A78;
+    --pink-tab: #5C5C5A;
+    --green: #4A4A48;
+    --green-tab: #2E2E2C;
+    --orange: #B8B8B0;
+    --orange-tab: #949490;
+    --shadow-off: 6px;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+    min-height: 100vh;
+    padding-bottom: 60px;
+  }
+
+  .mono { font-family: 'Space Mono', monospace; }
+
+  .wrap {
+    max-width: 460px;
+    margin: 0 auto;
+    padding: 22px 18px 0;
+  }
+
+  /* ---- Top bar ---- */
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 22px;
+  }
+
+  .icon-btn {
+    width: 46px;
+    height: 46px;
+    border-radius: 13px;
+    background: var(--cream);
+    border: 3px solid var(--ink);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ink);
+    box-shadow: 4px 4px 0 var(--ink);
+  }
+
+  .icon-btn svg { width: 20px; height: 20px; }
+
+  .inline-icon svg {
+    width: 20px;
+    height: 20px;
+    vertical-align: -5px;
+    margin-right: 2px;
+  }
+
+  /* ---- Hero ---- */
+  .hero {
+    font-size: 34px;
+    line-height: 1.08;
+    font-weight: 800;
+    margin: 0 0 20px;
+    letter-spacing: -0.01em;
+  }
+
+  /* ---- Stat cards ---- */
+  .stat-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 26px;
+  }
+
+  .stat-card {
+    flex: 1;
+    position: relative;
+    background: var(--cream);
+    border: 3px solid var(--ink);
+    border-radius: 16px;
+    padding: 16px 14px 14px;
+    box-shadow: var(--shadow-off) var(--shadow-off) 0 var(--ink);
+  }
+
+  .stat-card .tab {
+    position: absolute;
+    top: -10px;
+    left: 14px;
+    width: 46%;
+    height: 14px;
+    border-radius: 8px 8px 0 0;
+    border: 3px solid var(--ink);
+    border-bottom: none;
+  }
+
+  .stat-card.etb .tab { background: var(--purple); }
+  .stat-card.usd .tab { background: var(--green); }
+
+  .stat-card .label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #5B5748;
+    margin: 4px 0 8px;
+  }
+
+  .stat-card .amount {
+    font-size: 21px;
+    font-weight: 700;
+    margin: 0;
+    word-break: break-word;
+  }
+
+  /* ---- Section titles ---- */
+  h2.sec {
+    font-size: 15px;
+    font-weight: 800;
+    margin: 0 0 12px;
+    text-transform: none;
+  }
+
+  section.block { margin-bottom: 28px; }
+
+  /* ---- Next payday hero card ---- */
+  .next-card {
+    position: relative;
+    background: var(--pink);
+    border: 3px solid var(--ink);
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 7px 7px 0 var(--ink);
+    color: var(--cream);
+  }
+
+  .next-card .tab {
+    position: absolute;
+    top: -11px;
+    left: 18px;
+    width: 120px;
+    height: 15px;
+    background: var(--pink-tab);
+    border: 3px solid var(--ink);
+    border-bottom: none;
+    border-radius: 9px 9px 0 0;
+  }
+
+  .next-card .when {
+    font-size: 12px;
+    font-weight: 700;
+    margin: 6px 0 2px;
+  }
+
+  .next-card .source {
+    font-size: 22px;
+    font-weight: 800;
+    margin: 0 0 14px;
+  }
+
+  .next-card .figures {
+    display: flex;
+    gap: 10px;
+  }
+
+  .next-card .fig {
+    flex: 1;
+    background: var(--cream);
+    border: 2.5px solid var(--ink);
+    border-radius: 12px;
+    padding: 8px 10px;
+  }
+
+  .next-card .fig span {
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    color: #5B5748;
+    margin-bottom: 3px;
+  }
+
+  .next-card .fig b {
+    font-size: 14px;
+  }
+
+  /* ---- Payday grid ---- */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .p-card {
+    position: relative;
+    background: var(--cream);
+    border: 3px solid var(--ink);
+    border-radius: 16px;
+    padding: 14px 12px 12px;
+    box-shadow: 5px 5px 0 var(--ink);
+  }
+
+  .p-card .tab {
+    position: absolute;
+    top: -9px;
+    left: 12px;
+    width: 60%;
+    height: 13px;
+    border: 3px solid var(--ink);
+    border-bottom: none;
+    border-radius: 7px 7px 0 0;
+  }
+
+  .p-card.c1 .tab { background: var(--purple); }
+  .p-card.c2 .tab { background: var(--green); }
+  .p-card.c3 .tab { background: var(--pink); }
+  .p-card.c4 .tab { background: var(--orange); }
+
+  .p-card .icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    border: 2.5px solid var(--ink);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--cream);
+    margin: 4px 0 10px;
+  }
+
+  .p-card .icon svg { width: 20px; height: 20px; }
+
+  .p-card.c1 .icon { background: var(--purple); }
+  .p-card.c2 .icon { background: var(--green); }
+  .p-card.c3 .icon { background: var(--pink); }
+  .p-card.c4 .icon { background: var(--orange); color: var(--ink); }
+
+  .p-card .save-amt {
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .p-card .who {
+    font-size: 14px;
+    font-weight: 800;
+    margin-top: 3px;
+  }
+
+  .p-card .next-date {
+    font-size: 11px;
+    color: #5B5748;
+    font-weight: 600;
+    margin-top: 2px;
+  }
+
+  /* ---- Log button ---- */
+  .log-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+
+  button.log-btn {
+    flex: 1;
+    background: var(--ink);
+    color: var(--cream);
+    border: 3px solid var(--ink);
+    border-radius: 16px;
+    padding: 17px;
+    font-size: 15px;
+    font-family: inherit;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 6px 6px 0 #8A8A84;
+  }
+
+  button.log-btn:active {
+    transform: translate(3px, 3px);
+    box-shadow: 3px 3px 0 #8A8A84;
+  }
+
+  .footer-note {
+    font-size: 11px;
+    font-weight: 600;
+    color: #6B6754;
+    margin-top: 10px;
+    line-height: 1.4;
+  }
+
+  /* ---- History ---- */
+  .entry {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--cream);
+    border: 2.5px solid var(--ink);
+    border-radius: 13px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+  }
+
+  .entry-left { display: flex; align-items: center; gap: 10px; }
+
+  .entry .chip {
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+    border: 2px solid var(--ink);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ink);
+    flex-shrink: 0;
+  }
+
+  .entry .chip svg { width: 16px; height: 16px; }
+
+  .modal-opt .inline-icon svg { color: var(--ink); }
+
+  /* ---- Reminders panel ---- */
+  .remind-card {
+    background: var(--cream);
+    border: 3px solid var(--ink);
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 5px 5px 0 var(--ink);
+  }
+
+  .remind-card p.desc {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #4A4A48;
+    line-height: 1.5;
+    margin: 0 0 12px;
+  }
+
+  button.ics-btn {
+    width: 100%;
+    background: var(--cream);
+    color: var(--ink);
+    border: 2.5px solid var(--ink);
+    border-radius: 12px;
+    padding: 13px;
+    font-size: 13.5px;
+    font-family: inherit;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 4px 4px 0 var(--ink);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  button.ics-btn svg { width: 17px; height: 17px; }
+
+  button.ics-btn:active { transform: translate(2px,2px); box-shadow: 2px 2px 0 var(--ink); }
+
+  .entry .who { font-size: 13px; font-weight: 800; }
+  .entry .date { font-size: 10.5px; color: #6B6754; font-weight: 600; }
+  .entry .amt { font-weight: 800; font-size: 14px; }
+
+  .empty-note {
+    font-size: 13px;
+    font-weight: 600;
+    color: #6B6754;
+    background: var(--cream);
+    border: 2.5px dashed var(--ink);
+    border-radius: 13px;
+    padding: 16px;
+    text-align: center;
+  }
+
+  /* ---- Modal ---- */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(22,21,15,0.55);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 20;
+  }
+
+  .modal {
+    background: var(--bg);
+    width: 100%;
+    max-width: 460px;
+    border-radius: 22px 22px 0 0;
+    border: 3px solid var(--ink);
+    border-bottom: none;
+    padding: 22px 18px 26px;
+  }
+
+  .modal h3 {
+    margin: 0 0 16px;
+    font-size: 18px;
+    font-weight: 800;
+  }
+
+  .modal-opt {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    text-align: left;
+    background: var(--cream);
+    border: 2.5px solid var(--ink);
+    border-radius: 13px;
+    padding: 13px 14px;
+    margin-bottom: 9px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--ink);
+    cursor: pointer;
+    box-shadow: 3px 3px 0 var(--ink);
+  }
+
+  .modal-opt:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--ink); }
+
+  .modal-opt .a {
+    font-family: 'Space Mono', monospace;
+    font-weight: 700;
+  }
+
+  .modal-cancel {
+    display: block;
+    width: 100%;
+    text-align: center;
+    background: none;
+    border: none;
+    color: var(--ink);
+    font-weight: 700;
+    padding: 10px;
+    font-size: 14px;
+    font-family: inherit;
+    cursor: pointer;
+    margin-top: 4px;
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--ink);
+    color: var(--cream);
+    padding: 12px 20px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 700;
+    z-index: 30;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+  }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+
+<script>
+const ICONS = {
+  laptop: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="1"></rect><line x1="2" y1="20" x2="22" y2="20"></line></svg>',
+  ballot: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>',
+  phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>',
+  wallet: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"></path><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"></path><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"></path></svg>',
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>',
+  bell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>',
+  download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>',
+  moneybag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h8l2 4-3 10H9L6 10z"></path><path d="M9 6a3 3 0 0 1 6 0"></path></svg>'
+};
+function icn(key) { return ICONS[key] || ICONS.moneybag; }
+
+const RULES = [
+  { id: 'lsd', who: 'Land and Sea Dev', currency: 'ETB', freqDays: 14,
+    anchor: '2026-09-18', received: 22000, save: 14500, keep: 7500,
+    iconKey: 'laptop', cls: 'c1' },
+  { id: 'mmcy', who: 'MMCY', currency: 'ETB', freqMonthly: 'end',
+    received: 32000, save: 21000, keep: 11000,
+    iconKey: 'ballot', cls: 'c2' },
+  { id: 'sen15', who: 'Sentrama (15th)', currency: 'USD', freqMonthly: 15,
+    received: 300, save: 300, keep: 0,
+    iconKey: 'phone', cls: 'c3' },
+  { id: 'sen30', who: 'Sentrama (30th)', currency: 'USD', freqMonthly: 30,
+    received: 300, save: 300, keep: 0,
+    iconKey: 'phone', cls: 'c4' }
+];
+
+let entries = [];
+let loaded = false;
+
+function fmt(n, cur) {
+  const s = Math.round(n).toLocaleString('en-US');
+  return cur === 'USD' ? '$' + s : s + ' ETB';
+}
+
+function lastDayOfMonth(y, m) {
+  return new Date(y, m + 1, 0).getDate();
+}
+
+function nextOccurrence(rule, from) {
+  const d = new Date(from);
+  d.setHours(0,0,0,0);
+  if (rule.freqDays) {
+    let anchor = new Date(rule.anchor + 'T00:00:00');
+    while (anchor < d) {
+      anchor = new Date(anchor.getTime() + rule.freqDays * 86400000);
+    }
+    return anchor;
+  }
+  if (rule.freqMonthly === 'end') {
+    let y = d.getFullYear(), m = d.getMonth();
+    let candidate = new Date(y, m, lastDayOfMonth(y, m));
+    if (candidate < d) {
+      m += 1;
+      candidate = new Date(y, m, lastDayOfMonth(y, m));
+    }
+    return candidate;
+  }
+  let y = d.getFullYear(), m = d.getMonth();
+  let day = Math.min(rule.freqMonthly, lastDayOfMonth(y, m));
+  let candidate = new Date(y, m, day);
+  if (candidate < d) {
+    m += 1;
+    day = Math.min(rule.freqMonthly, lastDayOfMonth(y, m));
+    candidate = new Date(y, m, day);
+  }
+  return candidate;
+}
+
+function daysUntil(date) {
+  const now = new Date();
+  now.setHours(0,0,0,0);
+  return Math.round((date - now) / 86400000);
+}
+
+function dateLabel(date) {
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+async function loadEntries() {
+  try {
+    const res = await window.storage.get('entries', false);
+    entries = res && res.value ? JSON.parse(res.value) : [];
+  } catch (e) {
+    entries = [];
+  }
+  loaded = true;
+  render();
+}
+
+async function saveEntries() {
+  try {
+    await window.storage.set('entries', JSON.stringify(entries), false);
+  } catch (e) {
+    console.error('Storage error', e);
+  }
+}
+
+function totals() {
+  let etb = 0, usd = 0;
+  for (const e of entries) {
+    if (e.currency === 'ETB') etb += e.save;
+    else usd += e.save;
+  }
+  return { etb, usd };
+}
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2200);
+}
+
+function logPayday(ruleId) {
+  const rule = RULES.find(r => r.id === ruleId);
+  entries.unshift({
+    who: rule.who,
+    currency: rule.currency,
+    save: rule.save,
+    iconKey: rule.iconKey,
+    date: new Date().toISOString()
+  });
+  saveEntries();
+  closeModal();
+  showToast(rule.who + ' logged \u2014 ' + fmt(rule.save, rule.currency) + ' saved');
+  render();
+}
+
+function openModal() {
+  document.getElementById('modal-root').innerHTML = `
+    <div class="modal-backdrop" onclick="if(event.target===this) closeModal()">
+      <div class="modal">
+        <h3>Which payday came in?</h3>
+        ${RULES.map(r => `
+          <button class="modal-opt" onclick="logPayday('${r.id}')">
+            <span class="inline-icon">${icn(r.iconKey)}&nbsp;${r.who}</span>
+            <span class="a">${fmt(r.save, r.currency)}</span>
+          </button>
+        `).join('')}
+        <button class="modal-cancel" onclick="closeModal()">Cancel</button>
+      </div>
+    </div>
+  `;
+}
+
+function closeModal() {
+  document.getElementById('modal-root').innerHTML = '';
+}
+
+function pad(n) { return String(n).padStart(2, '0'); }
+
+function icsDate(date) {
+  return date.getFullYear().toString() + pad(date.getMonth()+1) + pad(date.getDate()) + 'T090000';
+}
+
+function downloadICS() {
+  const now = new Date();
+  let ics = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Savings Tracker//EN\r\nCALSCALE:GREGORIAN\r\n';
+
+  const specs = [
+    { rule: RULES[0], rrule: 'FREQ=WEEKLY;INTERVAL=2' },
+    { rule: RULES[1], rrule: 'FREQ=MONTHLY;BYMONTHDAY=-1' },
+    { rule: RULES[2], rrule: 'FREQ=MONTHLY;BYMONTHDAY=15' },
+    { rule: RULES[3], rrule: 'FREQ=MONTHLY;BYMONTHDAY=30' }
+  ];
+
+  specs.forEach((s, i) => {
+    const start = nextOccurrence(s.rule, now);
+    const summary = s.rule.who + ' payday \u2014 save ' + fmt(s.rule.save, s.rule.currency);
+    const desc = 'Save ' + fmt(s.rule.save, s.rule.currency) + ' of ' + fmt(s.rule.received, s.rule.currency) + ' from ' + s.rule.who + '.';
+    ics += 'BEGIN:VEVENT\r\n';
+    ics += 'UID:payday-' + s.rule.id + '-' + now.getTime() + '@savings-tracker\r\n';
+    ics += 'DTSTAMP:' + icsDate(now) + '\r\n';
+    ics += 'DTSTART:' + icsDate(start) + '\r\n';
+    ics += 'RRULE:' + s.rrule + '\r\n';
+    ics += 'SUMMARY:' + summary + '\r\n';
+    ics += 'DESCRIPTION:' + desc + (s.rule.id === 'sen30' ? ' Note: in months with fewer than 30 days this occurrence is skipped by the 30th rule.' : '') + '\r\n';
+    ics += 'BEGIN:VALARM\r\nTRIGGER:-PT0M\r\nACTION:DISPLAY\r\nDESCRIPTION:Payday reminder\r\nEND:VALARM\r\n';
+    ics += 'END:VEVENT\r\n';
+  });
+
+  ics += 'END:VCALENDAR\r\n';
+
+  const blob = new Blob([ics], { type: 'text/calendar' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'paydays.ics';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('Calendar file downloaded \u2014 open it to add to your Calendar app');
+}
+
+function render() {
+  const app = document.getElementById('app');
+  if (!loaded) {
+    app.innerHTML = '<div style="padding:60px 0;text-align:center;font-weight:700;">Loading\u2026</div>';
+    return;
+  }
+
+  const t = totals();
+
+  const upcoming = RULES.map(r => ({ rule: r, date: nextOccurrence(r, new Date()) }))
+    .sort((a, b) => a.date - b.date);
+  const next = upcoming[0];
+  const nextDays = daysUntil(next.date);
+  const nextWhen = nextDays === 0 ? 'Today' : nextDays === 1 ? 'Tomorrow' : `In ${nextDays} days \u00b7 ${dateLabel(next.date)}`;
+
+  app.innerHTML = `
+    <div class="topbar">
+      <div class="icon-btn">${icn('wallet')}</div>
+      <div class="icon-btn" onclick="openModal()">${icn('plus')}</div>
+    </div>
+
+    <h1 class="hero">Save first.<br>Spend what's left.</h1>
+
+    <div class="stat-row">
+      <div class="stat-card etb">
+        <div class="tab"></div>
+        <p class="label">SAVED \u00b7 BIRR</p>
+        <p class="amount mono">${t.etb.toLocaleString('en-US')}</p>
+      </div>
+      <div class="stat-card usd">
+        <div class="tab"></div>
+        <p class="label">SAVED \u00b7 DOLLARS</p>
+        <p class="amount mono">$${t.usd.toLocaleString('en-US')}</p>
+      </div>
+    </div>
+
+    <section class="block">
+      <h2 class="sec">Next payday</h2>
+      <div class="next-card">
+        <div class="tab"></div>
+        <p class="when">${nextWhen}</p>
+        <p class="source inline-icon">${icn(next.rule.iconKey)}&nbsp;${next.rule.who}</p>
+        <div class="figures">
+          <div class="fig"><span>COMING IN</span><b class="mono">${fmt(next.rule.received, next.rule.currency)}</b></div>
+          <div class="fig"><span>SAVE</span><b class="mono">${fmt(next.rule.save, next.rule.currency)}</b></div>
+          <div class="fig"><span>KEEP</span><b class="mono">${fmt(next.rule.keep, next.rule.currency)}</b></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block">
+      <h2 class="sec">My paydays</h2>
+      <div class="grid">
+        ${RULES.map(r => {
+          const occ = nextOccurrence(r, new Date());
+          return `
+          <div class="p-card ${r.cls}">
+            <div class="tab"></div>
+            <div class="icon">${icn(r.iconKey)}</div>
+            <div class="save-amt mono">save ${fmt(r.save, r.currency)}</div>
+            <div class="who">${r.who}</div>
+            <div class="next-date">${dateLabel(occ)}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="log-row">
+        <button class="log-btn" onclick="openModal()">${icn('plus')}&nbsp; Log a payday</button>
+      </div>
+    </section>
+
+    <section class="block">
+      <h2 class="sec">Payday reminders</h2>
+      <div class="remind-card">
+        <p class="desc">This page can't send push notifications on its own \u2014 it only checks in when you open it. For a real alert on your phone, download the calendar file below and add it to your Calendar app. It sets up all four paydays as recurring events with a reminder, for good.</p>
+        <button class="ics-btn" onclick="downloadICS()">${icn('bell')}&nbsp; Add paydays to my calendar</button>
+      </div>
+    </section>
+
+    <section class="block">
+      <h2 class="sec">History</h2>
+      ${entries.length === 0
+        ? '<div class="empty-note">Nothing logged yet. Tap \u201cLog a payday\u201d above once money lands.</div>'
+        : entries.map(e => `
+          <div class="entry">
+            <div class="entry-left">
+              <div class="chip">${icn(e.iconKey)}</div>
+              <div>
+                <div class="who">${e.who}</div>
+                <div class="date">${dateLabel(new Date(e.date))}</div>
+              </div>
+            </div>
+            <div class="amt mono">+${fmt(e.save, e.currency)}</div>
+          </div>
+        `).join('')}
+    </section>
+
+    <div id="modal-root"></div>
+  `;
+}
+
+loadEntries();
+</script>
+</body>
+</html>
