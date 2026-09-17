@@ -9,6 +9,8 @@ import { Icon } from "@/components/Icons";
 import { InstallButton, InstallPrompt, resetInstallDismissal } from "@/components/InstallPrompt";
 import { EmailReminders } from "@/components/EmailReminders";
 import { LogModal } from "@/components/LogModal";
+import { MobileBottomBar } from "@/components/MobileBottomBar";
+import { MobileMoreSheet } from "@/components/MobileMoreSheet";
 import { OpeningBalanceModal } from "@/components/OpeningBalanceModal";
 import { SourceBreakdown } from "@/components/SourceBreakdown";
 import { Toast } from "@/components/Toast";
@@ -62,6 +64,7 @@ export function SavingsTracker() {
   const [openingOpen, setOpeningOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [installOpen, setInstallOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [historyFilter, setHistoryFilter] = useState<HistoryFilter>("all");
   const [sourcePeriod, setSourcePeriod] = useState<SourcePeriod>("all");
@@ -141,7 +144,15 @@ export function SavingsTracker() {
             </span>
           </div>
         </div>
-        <div className="topbar-actions">
+        <button
+          type="button"
+          className="mobile-more-btn"
+          aria-label="More options"
+          onClick={() => setMoreOpen(true)}
+        >
+          More
+        </button>
+        <div className="topbar-actions desktop-only">
           <button
             type="button"
             className="ghost-btn"
@@ -162,8 +173,7 @@ export function SavingsTracker() {
             Adjust
           </button>
           <button type="button" className="ghost-btn expense-btn" onClick={() => setExpenseOpen(true)}>
-            <span className="btn-label-full">Log expense</span>
-            <span className="btn-label-short">Expense</span>
+            Log expense
           </button>
           <button type="button" className="log-btn" onClick={() => setModalOpen(true)}>
             <Icon name="plus" />
@@ -515,6 +525,23 @@ export function SavingsTracker() {
           }}
         />
       )}
+      <MobileBottomBar
+        onLogPayday={() => setModalOpen(true)}
+        onExpense={() => setExpenseOpen(true)}
+      />
+      <MobileMoreSheet
+        open={moreOpen}
+        onClose={() => setMoreOpen(false)}
+        onAdjust={() => setAdjustOpen(true)}
+        onInstall={() => {
+          resetInstallDismissal();
+          setInstallOpen(true);
+        }}
+        onSignOut={async () => {
+          await fetch("/api/auth/logout", { method: "POST" });
+          window.location.href = "/login";
+        }}
+      />
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
       <AiCoachFab onOpen={() => setAiOpen(true)} />
       <AiCoachPanel

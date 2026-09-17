@@ -352,7 +352,7 @@ export function AiCoachFab({ onOpen }: AiCoachFabProps) {
   return (
     <button type="button" className="ai-fab" onClick={onOpen} aria-label="Open AI savings coach">
       <Icon name="sparkles" />
-      AI Coach
+      <span className="ai-fab-label">AI Coach</span>
     </button>
   );
 }
