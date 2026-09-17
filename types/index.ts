@@ -1,5 +1,9 @@
 export type Currency = "ETB" | "USD";
 
+export type Pool = "saved" | "spendable";
+
+export type LedgerEntryType = "payday" | "expense" | "opening_balance" | "adjustment";
+
 export type IconKey =
   | "laptop"
   | "headset"
@@ -29,6 +33,23 @@ export type PaydayRule = {
   cls: CardClass;
 };
 
+export type LedgerEntry = {
+  id: string;
+  type: LedgerEntryType;
+  who: string;
+  sourceId?: string;
+  currency: Currency;
+  amount: number;
+  pool: Pool;
+  iconKey: IconKey;
+  note?: string;
+  date: string;
+  received?: number;
+  saveAmount?: number;
+  keepAmount?: number;
+};
+
+/** @deprecated Use LedgerEntry — kept for migration */
 export type SavingsEntry = {
   id: string;
   who: string;
@@ -43,14 +64,43 @@ export type Totals = {
   usd: number;
 };
 
+export type SourceBalance = {
+  ruleId: string;
+  who: string;
+  currency: Currency;
+  cls: CardClass;
+  iconKey: IconKey;
+  received: number;
+  saved: number;
+};
+
+export type Balances = {
+  saved: Totals;
+  spendable: Totals;
+  received: Totals;
+  bySource: SourceBalance[];
+};
+
+export type SourcePeriod = "all" | "month";
+
 export type SourceSavings = {
   rule: PaydayRule;
   saved: number;
+  received: number;
   share: number;
+  savedAllTime?: number;
+  receivedAllTime?: number;
 };
 
 export type UpcomingItem = {
   rule: PaydayRule;
   date: Date;
   days: number;
+};
+
+export type AffordabilityResult = {
+  ok: boolean;
+  usePool: Pool;
+  remainingAfter: number;
+  message: string;
 };

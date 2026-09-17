@@ -6,7 +6,7 @@ import { formatAmount } from "@/lib/format";
 import { PAYDAY_RULES } from "@/lib/rules";
 import { monthlyProjection, overallSavingsRate } from "@/lib/stats";
 import type { AiAction, AiChatMessage, AiContextPayload, AiChatResponse } from "@/types/ai";
-import type { PaydayRule, SavingsEntry, Totals } from "@/types";
+import type { Balances, Currency, LedgerEntry, PaydayRule, Pool } from "@/types";
 import type { SavingsGoal } from "@/types/ai";
 
 type TabId = "chat" | "summary" | "goals" | "insights";
@@ -14,10 +14,16 @@ type TabId = "chat" | "summary" | "goals" | "insights";
 type AiCoachPanelProps = {
   open: boolean;
   onClose: () => void;
-  entries: SavingsEntry[];
-  totals: Totals;
+  entries: LedgerEntry[];
+  balances: Balances;
   goals: SavingsGoal[];
   onLogPayday: (rule: PaydayRule) => void;
+  onLogExpense: (params: {
+    amount: number;
+    currency: Currency;
+    pool: Pool;
+    note?: string;
+  }) => void;
   onAddGoal: (label: string, target: number, currency: SavingsGoal["currency"]) => void;
   onAddGoalObject: (goal: SavingsGoal) => void;
   onRemoveGoal: (id: string) => void;
@@ -27,7 +33,7 @@ type AiCoachPanelProps = {
 const QUICK_PROMPTS = [
   "Give me a savings summary",
   "MMCY paid today",
-  "What if I save 80% from Land and Sea?",
+  "Log 3,000 ETB groceries from spendable",
   "Can I spend 5,000 ETB this week?",
 ];
 
@@ -35,9 +41,10 @@ export function AiCoachPanel({
   open,
   onClose,
   entries,
-  totals,
+  balances,
   goals,
   onLogPayday,
+  onLogExpense,
   onAddGoal,
   onAddGoalObject,
   onRemoveGoal,
@@ -64,13 +71,13 @@ export function AiCoachPanel({
 
   const context = useMemo<AiContextPayload>(
     () => ({
-      totals,
+      balances,
       entries,
       goals,
       projection: monthlyProjection(),
       overallSaveRate: overallSavingsRate(),
     }),
-    [totals, entries, goals],
+    [balances, entries, goals],
   );
 
   const applyActions = (actions: AiAction[]) => {
@@ -78,6 +85,14 @@ export function AiCoachPanel({
       if (action.type === "log_payday") {
         const rule = PAYDAY_RULES.find((item) => item.id === action.ruleId);
         if (rule) onLogPayday(rule);
+      }
+      if (action.type === "log_expense") {
+        onLogExpense({
+          amount: action.amount,
+          currency: action.currency,
+          pool: action.pool,
+          note: action.note,
+        });
       }
       if (action.type === "set_goal") {
         onAddGoalObject(action.goal);
@@ -130,6 +145,9 @@ export function AiCoachPanel({
       if (result.actions.some((action) => action.type === "log_payday")) {
         onToast("Payday logged via AI coach");
       }
+      if (result.actions.some((action) => action.type === "log_expense")) {
+        onToast("Expense logged via AI coach");
+      }
     } catch {
       onToast("Could not reach AI coach");
     } finally {
@@ -160,7 +178,7 @@ export function AiCoachPanel({
   };
 
   const goalProgress = (goal: SavingsGoal) => {
-    const saved = goal.currency === "ETB" ? totals.etb : totals.usd;
+    const saved = goal.currency === "ETB" ? balances.saved.etb : balances.saved.usd;
     return Math.min(100, Math.round((saved / goal.target) * 100));
   };
 
@@ -282,7 +300,7 @@ export function AiCoachPanel({
               ) : (
                 goals.map((goal) => {
                   const pct = goalProgress(goal);
-                  const saved = goal.currency === "ETB" ? totals.etb : totals.usd;
+                  const saved = goal.currency === "ETB" ? balances.saved.etb : balances.saved.usd;
                   return (
                     <div key={goal.id} className="ai-goal-item">
                       <div className="ai-goal-top">

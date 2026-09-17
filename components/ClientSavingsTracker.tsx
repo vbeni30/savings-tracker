@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 
 const SavingsTracker = dynamic(
   () => import("@/components/SavingsTracker").then((mod) => mod.SavingsTracker),
@@ -15,5 +16,10 @@ const SavingsTracker = dynamic(
 );
 
 export function ClientSavingsTracker() {
-  return <SavingsTracker />;
+  return (
+    <>
+      <ServiceWorkerRegister />
+      <SavingsTracker />
+    </>
+  );
 }

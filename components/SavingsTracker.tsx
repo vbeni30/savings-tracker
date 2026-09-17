@@ -1,29 +1,40 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { Icon } from "@/components/Icons";
+import { AdjustBalanceModal } from "@/components/AdjustBalanceModal";
+import { AppAlerts } from "@/components/AppAlerts";
 import { AiCoachFab, AiCoachPanel } from "@/components/AiCoachPanel";
+import { ExpenseModal } from "@/components/ExpenseModal";
+import { Icon } from "@/components/Icons";
 import { InstallButton, InstallPrompt, resetInstallDismissal } from "@/components/InstallPrompt";
 import { EmailReminders } from "@/components/EmailReminders";
 import { LogModal } from "@/components/LogModal";
+import { OpeningBalanceModal } from "@/components/OpeningBalanceModal";
 import { SourceBreakdown } from "@/components/SourceBreakdown";
 import { Toast } from "@/components/Toast";
 import { UpcomingTimeline } from "@/components/UpcomingTimeline";
-import { useEntries } from "@/hooks/useEntries";
 import { useGoals } from "@/hooks/useGoals";
+import { useLedger } from "@/hooks/useLedger";
 import { downloadCalendarFile } from "@/lib/calendar";
+import {
+  entryDisplayAmount,
+  entryIsCredit,
+  entryLabel,
+} from "@/lib/ledger";
 import { formatAmount, formatDate, formatPercent, formatWhenLabel } from "@/lib/format";
 import { daysUntil, getNextPayday, nextOccurrence } from "@/lib/payday";
 import { PAYDAY_RULES } from "@/lib/rules";
 import {
-  filterEntries,
+  currentMonthLabel,
+  filterLedgerEntries,
   monthlyProjection,
   overallSavingsRate,
-  savingsBySource,
   savingsRate,
+  hasLoggedPaydays,
+  sourceRowsForPeriod,
   upcomingSchedule,
 } from "@/lib/stats";
-import type { Currency, PaydayRule } from "@/types";
+import type { Currency, PaydayRule, SourcePeriod } from "@/types";
 
 type HistoryFilter = "all" | Currency;
 
@@ -31,39 +42,61 @@ export function SavingsTracker() {
   const {
     entries,
     loaded,
-    totals,
+    balances,
+    openingDone,
     logPayday,
+    logExpense,
+    addOpeningBalances,
+    adjustBalance,
+    skipOpeningBalance,
     removeEntry,
     undoLast,
     handleExport,
     handleImport,
-  } = useEntries();
+  } = useLedger();
   const { goals, addGoal, addGoalObject, removeGoal } = useGoals();
 
   const [modalOpen, setModalOpen] = useState(false);
+  const [expenseOpen, setExpenseOpen] = useState(false);
+  const [adjustOpen, setAdjustOpen] = useState(false);
+  const [openingOpen, setOpeningOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [installOpen, setInstallOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [historyFilter, setHistoryFilter] = useState<HistoryFilter>("all");
+  const [sourcePeriod, setSourcePeriod] = useState<SourcePeriod>("all");
   const importRef = useRef<HTMLInputElement>(null);
+  const monthLabel = currentMonthLabel();
 
   const nextPayday = getNextPayday(PAYDAY_RULES);
   const nextDays = daysUntil(nextPayday.date);
   const nextWhen = formatWhenLabel(nextDays, nextPayday.date);
   const projection = monthlyProjection();
   const schedule = upcomingSchedule();
-  const etbBreakdown = useMemo(() => savingsBySource(entries, "ETB"), [entries]);
-  const usdBreakdown = useMemo(() => savingsBySource(entries, "USD"), [entries]);
+  const etbBreakdown = useMemo(
+    () => sourceRowsForPeriod(entries, "ETB", sourcePeriod),
+    [entries, sourcePeriod],
+  );
+  const usdBreakdown = useMemo(
+    () => sourceRowsForPeriod(entries, "USD", sourcePeriod),
+    [entries, sourcePeriod],
+  );
   const filteredEntries = useMemo(
-    () => filterEntries(entries, historyFilter),
+    () => filterLedgerEntries(entries, historyFilter),
     [entries, historyFilter],
   );
-  const hasSavings = totals.etb > 0 || totals.usd > 0;
+  const hasPaydayLogs = useMemo(() => hasLoggedPaydays(entries), [entries]);
+  const showEtbBreakdown = etbBreakdown.length > 0;
+  const showUsdBreakdown = usdBreakdown.length > 0;
+
+  const showOpeningWizard = loaded && !openingDone;
 
   const handleLog = (rule: PaydayRule) => {
     logPayday(rule);
     setModalOpen(false);
-    setToast(`${rule.who} logged — ${formatAmount(rule.save, rule.currency)} saved`);
+    setToast(
+      `${rule.who} logged — ${formatAmount(rule.save, rule.currency)} saved, ${formatAmount(rule.keep, rule.currency)} spendable`,
+    );
   };
 
   const handleCalendarDownload = () => {
@@ -104,7 +137,7 @@ export function SavingsTracker() {
           <div className="brand-text">
             <span className="brand-name">Savings Tracker</span>
             <span className="brand-sub">
-              {entries.length} {entries.length === 1 ? "entry" : "entries"} logged
+              {entries.length} {entries.length === 1 ? "entry" : "entries"} in ledger
             </span>
           </div>
         </div>
@@ -125,12 +158,28 @@ export function SavingsTracker() {
               setInstallOpen(true);
             }}
           />
+          <button type="button" className="ghost-btn" onClick={() => setAdjustOpen(true)}>
+            Adjust
+          </button>
+          <button type="button" className="ghost-btn expense-btn" onClick={() => setExpenseOpen(true)}>
+            <span className="btn-label-full">Log expense</span>
+            <span className="btn-label-short">Expense</span>
+          </button>
           <button type="button" className="log-btn" onClick={() => setModalOpen(true)}>
             <Icon name="plus" />
             Log payday
           </button>
         </div>
       </header>
+
+      <AppAlerts
+        entryCount={entries.length}
+        spendableEtb={balances.spendable.etb}
+        onExport={() => {
+          handleExport();
+          setToast("Backup exported — keep the JSON file somewhere safe");
+        }}
+      />
 
       <div className="dashboard">
         <main className="dashboard-main">
@@ -149,8 +198,19 @@ export function SavingsTracker() {
                 </span>
                 <p className="label">SAVED · BIRR</p>
               </div>
-              <p className="amount mono">{totals.etb.toLocaleString("en-US")}</p>
-              <p className="stat-meta mono">~{Math.round(projection.etb).toLocaleString("en-US")}/mo</p>
+              <p className="amount mono">{balances.saved.etb.toLocaleString("en-US")}</p>
+              <p className="stat-meta mono">~{Math.round(projection.etb).toLocaleString("en-US")}/mo in</p>
+            </div>
+            <div className="stat-card spendable">
+              <div className="tab" />
+              <div className="stat-label-row">
+                <span className="stat-icon c2">
+                  <Icon name="moneybag" />
+                </span>
+                <p className="label">SPENDABLE · BIRR</p>
+              </div>
+              <p className="amount mono">{balances.spendable.etb.toLocaleString("en-US")}</p>
+              <p className="stat-meta">for daily costs</p>
             </div>
             <div className="stat-card usd">
               <div className="tab" />
@@ -160,19 +220,24 @@ export function SavingsTracker() {
                 </span>
                 <p className="label">SAVED · DOLLARS</p>
               </div>
-              <p className="amount mono">${totals.usd.toLocaleString("en-US")}</p>
-              <p className="stat-meta mono">~${Math.round(projection.usd).toLocaleString("en-US")}/mo</p>
+              <p className="amount mono">${balances.saved.usd.toLocaleString("en-US")}</p>
+              <p className="stat-meta mono">
+                ~${Math.round(projection.usd).toLocaleString("en-US")}/mo in
+                {balances.spendable.usd > 0 && (
+                  <> · ${balances.spendable.usd.toLocaleString("en-US")} spendable</>
+                )}
+              </p>
             </div>
             <div className="stat-card rate">
               <div className="tab" />
               <div className="stat-label-row">
-                <span className="stat-icon c2">
+                <span className="stat-icon c4">
                   <Icon name="headset" />
                 </span>
                 <p className="label">AVG SAVE RATE</p>
               </div>
               <p className="amount mono">{formatPercent(overallSavingsRate())}</p>
-              <p className="stat-meta">across all income</p>
+              <p className="stat-meta">across planned income</p>
             </div>
           </div>
 
@@ -245,12 +310,48 @@ export function SavingsTracker() {
             </div>
           </section>
 
-          {hasSavings && (
+          {hasPaydayLogs && (showEtbBreakdown || showUsdBreakdown) && (
             <section className="block">
-              <h2 className="sec">Savings by source</h2>
+              <div className="sec-row sec-row-split">
+                <div className="sec-row-left">
+                  <h2 className="sec">Savings by employer</h2>
+                  <p className="sec-hint">
+                    How much each payday (Land and Sea, MMCY, Sentrama) added to savings
+                  </p>
+                </div>
+                <div className="filter-row period-toggle" role="group" aria-label="Employer totals period">
+                  {(["all", "month"] as const).map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={`filter-btn${sourcePeriod === value ? " active" : ""}`}
+                      onClick={() => setSourcePeriod(value)}
+                    >
+                      {value === "all" ? "All time" : "This month"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {sourcePeriod === "month" && (
+                <p className="period-note mono">{monthLabel}</p>
+              )}
               <div className="breakdown-card">
-                <SourceBreakdown title="Birr sources" rows={etbBreakdown} />
-                <SourceBreakdown title="Dollar sources" rows={usdBreakdown} />
+                {showEtbBreakdown && (
+                  <SourceBreakdown
+                    title="Birr employers"
+                    rows={etbBreakdown}
+                    period={sourcePeriod}
+                    monthLabel={monthLabel}
+                  />
+                )}
+                {showUsdBreakdown && (
+                  <SourceBreakdown
+                    title="Dollar employers"
+                    rows={usdBreakdown}
+                    period={sourcePeriod}
+                    monthLabel={monthLabel}
+                  />
+                )}
               </div>
             </section>
           )}
@@ -283,6 +384,9 @@ export function SavingsTracker() {
             <div className="sec-row">
               <h2 className="sec">History</h2>
               <div className="backup-actions">
+                <button type="button" className="ghost-btn" onClick={() => setOpeningOpen(true)}>
+                  Opening balances
+                </button>
                 <button type="button" className="ghost-btn" onClick={handleExport}>
                   Export
                 </button>
@@ -324,35 +428,46 @@ export function SavingsTracker() {
             {filteredEntries.length === 0 ? (
               <div className="empty-note">
                 {entries.length === 0
-                  ? 'Nothing logged yet. Tap "Log payday" or click a payday card when money lands.'
+                  ? 'Nothing logged yet. Set opening balances, tap "Log payday", or log an expense.'
                   : "No entries match this filter."}
               </div>
             ) : (
               <div className="history-list">
-                {filteredEntries.map((entry) => (
-                  <div key={entry.id} className="entry">
-                    <div className="entry-left">
-                      <div className="chip">
-                        <Icon name={entry.iconKey} />
+                {filteredEntries.map((entry) => {
+                  const credit = entryIsCredit(entry);
+                  const displayAmount = entryDisplayAmount(entry);
+                  return (
+                    <div
+                      key={entry.id}
+                      className={`entry${credit ? "" : " debit"}`}
+                    >
+                      <div className="entry-left">
+                        <div className="chip">
+                          <Icon name={entry.iconKey} />
+                        </div>
+                        <div>
+                          <div className="entry-type">{entry.type.replace(/_/g, " ")}</div>
+                          <div className="who">{entryLabel(entry)}</div>
+                          <div className="date">{formatDate(new Date(entry.date))}</div>
+                        </div>
                       </div>
-                      <div>
-                        <div className="who">{entry.who}</div>
-                        <div className="date">{formatDate(new Date(entry.date))}</div>
+                      <div className="entry-right">
+                        <div className="amt mono">
+                          {credit ? "+" : "−"}
+                          {formatAmount(displayAmount, entry.currency)}
+                        </div>
+                        <button
+                          type="button"
+                          className="delete-btn"
+                          aria-label={`Remove ${entryLabel(entry)} entry`}
+                          onClick={() => removeEntry(entry.id)}
+                        >
+                          ×
+                        </button>
                       </div>
                     </div>
-                    <div className="entry-right">
-                      <div className="amt mono">+{formatAmount(entry.save, entry.currency)}</div>
-                      <button
-                        type="button"
-                        className="delete-btn"
-                        aria-label={`Remove ${entry.who} entry`}
-                        onClick={() => removeEntry(entry.id)}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </section>
@@ -361,15 +476,60 @@ export function SavingsTracker() {
 
       <InstallPrompt forceShow={installOpen} />
       {modalOpen && <LogModal onClose={() => setModalOpen(false)} onSelect={handleLog} />}
+      {expenseOpen && (
+        <ExpenseModal
+          onClose={() => setExpenseOpen(false)}
+          onSubmit={(params) => {
+            logExpense(params);
+            setExpenseOpen(false);
+            setToast(
+              `Expense logged — ${formatAmount(params.amount, params.currency)} from ${params.pool}`,
+            );
+          }}
+        />
+      )}
+      {adjustOpen && (
+        <AdjustBalanceModal
+          onClose={() => setAdjustOpen(false)}
+          onSubmit={(params) => {
+            adjustBalance(params);
+            setAdjustOpen(false);
+            setToast(
+              `${params.direction === "add" ? "Added" : "Subtracted"} ${formatAmount(params.amount, params.currency)} ${params.direction === "add" ? "to" : "from"} ${params.pool}`,
+            );
+          }}
+        />
+      )}
+      {(showOpeningWizard || openingOpen) && (
+        <OpeningBalanceModal
+          allowSkip={showOpeningWizard}
+          onSkip={() => {
+            skipOpeningBalance();
+            setOpeningOpen(false);
+          }}
+          onClose={() => setOpeningOpen(false)}
+          onSubmit={(params) => {
+            addOpeningBalances(params);
+            setOpeningOpen(false);
+            setToast("Opening balances saved");
+          }}
+        />
+      )}
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
       <AiCoachFab onOpen={() => setAiOpen(true)} />
       <AiCoachPanel
         open={aiOpen}
         onClose={() => setAiOpen(false)}
         entries={entries}
-        totals={totals}
+        balances={balances}
         goals={goals}
         onLogPayday={handleLog}
+        onLogExpense={(params) => {
+          logExpense(params);
+          setToast(
+            `Expense logged — ${formatAmount(params.amount, params.currency)} from ${params.pool}`,
+          );
+        }}
         onAddGoal={addGoal}
         onAddGoalObject={addGoalObject}
         onRemoveGoal={removeGoal}

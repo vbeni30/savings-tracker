@@ -1,4 +1,4 @@
-import type { Currency, SavingsEntry, Totals } from "@/types";
+import type { Balances, Currency, LedgerEntry, Pool, Totals } from "@/types";
 
 export type SavingsGoal = {
   id: string;
@@ -16,11 +16,18 @@ export type AiChatMessage = {
 
 export type AiAction =
   | { type: "log_payday"; ruleId: string; who: string }
-  | { type: "set_goal"; goal: SavingsGoal };
+  | { type: "set_goal"; goal: SavingsGoal }
+  | {
+      type: "log_expense";
+      amount: number;
+      currency: Currency;
+      pool: Pool;
+      note?: string;
+    };
 
 export type AiContextPayload = {
-  totals: Totals;
-  entries: SavingsEntry[];
+  balances: Balances;
+  entries: LedgerEntry[];
   goals: SavingsGoal[];
   projection: Totals;
   overallSaveRate: number;

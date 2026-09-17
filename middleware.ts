@@ -6,6 +6,7 @@ import { SESSION_COOKIE } from "@/lib/auth";
 const PUBLIC_PATHS = [
   "/login",
   "/manifest.webmanifest",
+  "/sw.js",
   "/brand/",
   "/icon",
   "/apple-icon",

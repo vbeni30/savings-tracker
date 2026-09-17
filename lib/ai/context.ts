@@ -1,13 +1,22 @@
+import { entryDisplayAmount, entryIsCredit, entryLabel } from "@/lib/ledger";
 import { formatAmount, formatDate, formatWhenLabel } from "@/lib/format";
 import { PAYDAY_RULES } from "@/lib/rules";
 import { upcomingSchedule } from "@/lib/stats";
 import type { AiContextPayload } from "@/types/ai";
 
+function formatHistoryLine(entry: AiContextPayload["entries"][number]): string {
+  const sign = entryIsCredit(entry) ? "+" : "−";
+  const amount = entryDisplayAmount(entry);
+  const pool = entry.type === "expense" || entry.type === "opening_balance" || entry.type === "adjustment"
+    ? ` (${entry.pool})`
+    : "";
+  return `- ${entryLabel(entry)}: ${sign}${formatAmount(amount, entry.currency)}${pool} on ${formatDate(new Date(entry.date))}`;
+}
+
 export function buildContextBlock(context: AiContextPayload): string {
+  const { balances } = context;
   const schedule = upcomingSchedule();
-  const recent = context.entries.slice(0, 8).map((entry) => {
-    return `- ${entry.who}: +${formatAmount(entry.save, entry.currency)} on ${formatDate(new Date(entry.date))}`;
-  });
+  const recent = context.entries.slice(0, 10).map(formatHistoryLine);
 
   const rules = PAYDAY_RULES.map((rule) => {
     const freq = rule.freqDays
@@ -28,12 +37,27 @@ export function buildContextBlock(context: AiContextPayload): string {
     .map(({ rule, date, days }) => `- ${rule.who}: ${formatWhenLabel(days, date)} (${formatDate(date)})`)
     .join("\n");
 
+  const sourceLines = balances.bySource.length
+    ? balances.bySource
+        .map(
+          (source) =>
+            `- ${source.who}: received ${formatAmount(source.received, source.currency)} | saved ${formatAmount(source.saved, source.currency)}`,
+        )
+        .join("\n")
+    : "- none logged yet";
+
   return [
-    "CURRENT TOTALS",
-    `- ETB saved: ${context.totals.etb.toLocaleString("en-US")}`,
-    `- USD saved: $${context.totals.usd.toLocaleString("en-US")}`,
-    `- Monthly projection: ~${context.projection.etb.toLocaleString("en-US")} ETB / ~$${context.projection.usd.toLocaleString("en-US")} USD`,
-    `- Overall save rate: ${Math.round(context.overallSaveRate)}%`,
+    "CURRENT BALANCES",
+    `- ETB saved: ${balances.saved.etb.toLocaleString("en-US")}`,
+    `- ETB spendable: ${balances.spendable.etb.toLocaleString("en-US")}`,
+    `- USD saved: $${balances.saved.usd.toLocaleString("en-US")}`,
+    `- USD spendable: $${balances.spendable.usd.toLocaleString("en-US")}`,
+    `- Total income logged: ${balances.received.etb.toLocaleString("en-US")} ETB / $${balances.received.usd.toLocaleString("en-US")} USD`,
+    `- Monthly save projection: ~${context.projection.etb.toLocaleString("en-US")} ETB / ~$${context.projection.usd.toLocaleString("en-US")} USD`,
+    `- Overall save rate (plan): ${Math.round(context.overallSaveRate)}%`,
+    "",
+    "PER-SOURCE (logged paydays)",
+    sourceLines,
     "",
     "PAYDAY RULES",
     ...rules,
@@ -44,7 +68,7 @@ export function buildContextBlock(context: AiContextPayload): string {
     "GOALS",
     goals,
     "",
-    "RECENT HISTORY (newest first)",
+    "RECENT LEDGER (newest first)",
     recent.length ? recent.join("\n") : "- none logged yet",
   ].join("\n");
 }

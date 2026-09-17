@@ -9,8 +9,10 @@ Rules:
 - Use ONLY the user data snapshot provided — never invent balances or dates.
 - Be concise, practical, and friendly. Use short paragraphs or bullets.
 - When the user wants to log a payday, call log_payday with the correct rule id.
+- When the user logs spending, call log_expense with amount, currency, pool (spendable for daily costs, saved only if they explicitly touch savings).
 - When the user sets a savings goal, call set_goal.
 - For what-if questions, call run_what_if then explain results clearly.
+- For "can I afford" questions, use saved vs spendable balances from the snapshot — prefer spendable pool.
 - Amounts: ETB for birr, USD for dollars.
 - Available rule ids: lsd, mmcy, sen15, sen30.
 
@@ -32,6 +34,23 @@ const TOOLS = [
           ruleId: { type: "string", enum: ["lsd", "mmcy", "sen15", "sen30"] },
         },
         required: ["ruleId"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "log_expense",
+      description: "Log money spent from saved or spendable pool",
+      parameters: {
+        type: "object",
+        properties: {
+          amount: { type: "number" },
+          currency: { type: "string", enum: ["ETB", "USD"] },
+          pool: { type: "string", enum: ["saved", "spendable"] },
+          note: { type: "string" },
+        },
+        required: ["amount", "currency", "pool"],
       },
     },
   },
@@ -157,6 +176,17 @@ export async function runOpenAiChat(request: AiChatRequest): Promise<AiChatRespo
           } else {
             toolResult = "Unknown rule id.";
           }
+        }
+
+        if (call.function.name === "log_expense") {
+          actions.push({
+            type: "log_expense",
+            amount: Number(args.amount),
+            currency: args.currency as "ETB" | "USD",
+            pool: args.pool as "saved" | "spendable",
+            note: args.note ? String(args.note) : undefined,
+          });
+          toolResult = `Logged expense of ${args.amount} ${args.currency} from ${args.pool}.`;
         }
 
         if (call.function.name === "set_goal") {
