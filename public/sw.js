@@ -4,55 +4,82 @@ const PAGE_CACHE = `${CACHE_VERSION}-pages`;
 
 const PRECACHE_URLS = ["/", "/login", "/manifest.webmanifest"];
 
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches
-      .open(PAGE_CACHE)
-      .then((cache) => cache.addAll(PRECACHE_URLS))
-      .then(() => self.skipWaiting()),
+function isDevHost(hostname) {
+  return (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname.startsWith("192.168.") ||
+    hostname.endsWith(".local")
   );
-});
+}
 
-self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    caches
-      .keys()
-      .then((keys) =>
-        Promise.all(
-          keys
-            .filter(
-              (key) =>
-                key.startsWith("savings-tracker-") &&
-                key !== STATIC_CACHE &&
-                key !== PAGE_CACHE,
-            )
-            .map((key) => caches.delete(key)),
-        ),
-      )
-      .then(() => self.clients.claim()),
-  );
-});
+const DEV_HOST = isDevHost(self.location.hostname);
 
-self.addEventListener("fetch", (event) => {
-  const { request } = event;
-  if (request.method !== "GET") return;
+if (DEV_HOST) {
+  self.addEventListener("install", (event) => {
+    event.waitUntil(self.skipWaiting());
+  });
 
-  const url = new URL(request.url);
-  if (url.origin !== self.location.origin) return;
-  if (url.pathname.startsWith("/api/")) return;
+  self.addEventListener("activate", (event) => {
+    event.waitUntil(
+      caches
+        .keys()
+        .then((keys) => Promise.all(keys.map((key) => caches.delete(key))))
+        .then(() => self.registration.unregister())
+        .then(() => self.clients.claim()),
+    );
+  });
+} else {
+  self.addEventListener("install", (event) => {
+    event.waitUntil(
+      caches
+        .open(PAGE_CACHE)
+        .then((cache) => cache.addAll(PRECACHE_URLS))
+        .then(() => self.skipWaiting()),
+    );
+  });
 
-  if (url.pathname.startsWith("/_next/static/")) {
-    event.respondWith(cacheFirst(request, STATIC_CACHE));
-    return;
-  }
+  self.addEventListener("activate", (event) => {
+    event.waitUntil(
+      caches
+        .keys()
+        .then((keys) =>
+          Promise.all(
+            keys
+              .filter(
+                (key) =>
+                  key.startsWith("savings-tracker-") &&
+                  key !== STATIC_CACHE &&
+                  key !== PAGE_CACHE,
+              )
+              .map((key) => caches.delete(key)),
+          ),
+        )
+        .then(() => self.clients.claim()),
+    );
+  });
 
-  if (request.mode === "navigate" || request.headers.get("accept")?.includes("text/html")) {
-    event.respondWith(networkFirstPage(request));
-    return;
-  }
+  self.addEventListener("fetch", (event) => {
+    const { request } = event;
+    if (request.method !== "GET") return;
 
-  event.respondWith(staleWhileRevalidate(request, STATIC_CACHE));
-});
+    const url = new URL(request.url);
+    if (url.origin !== self.location.origin) return;
+    if (url.pathname.startsWith("/api/")) return;
+
+    if (url.pathname.startsWith("/_next/static/")) {
+      event.respondWith(cacheFirst(request, STATIC_CACHE));
+      return;
+    }
+
+    if (request.mode === "navigate" || request.headers.get("accept")?.includes("text/html")) {
+      event.respondWith(networkFirstPage(request));
+      return;
+    }
+
+    event.respondWith(staleWhileRevalidate(request, STATIC_CACHE));
+  });
+}
 
 async function cacheFirst(request, cacheName) {
   const cache = await caches.open(cacheName);
