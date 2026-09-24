@@ -14,7 +14,7 @@ import { MobileMoreSheet } from "@/components/MobileMoreSheet";
 import { OpeningBalanceModal } from "@/components/OpeningBalanceModal";
 import { SourceBreakdown } from "@/components/SourceBreakdown";
 import { Toast } from "@/components/Toast";
-import { UpcomingTimeline } from "@/components/UpcomingTimeline";
+import { UpcomingSchedule } from "@/components/UpcomingSchedule";
 import { useCloudSync } from "@/hooks/useCloudSync";
 import { useGoals } from "@/hooks/useGoals";
 import { useLedger } from "@/hooks/useLedger";
@@ -36,7 +36,6 @@ import {
   savingsRate,
   hasLoggedPaydays,
   sourceRowsForPeriod,
-  upcomingSchedule,
 } from "@/lib/stats";
 import type { Currency, PaydayRule, SourcePeriod } from "@/types";
 
@@ -90,7 +89,6 @@ export function SavingsTracker() {
   const nextDays = daysUntil(nextPayday.date);
   const nextWhen = formatWhenLabel(nextDays, nextPayday.date);
   const projection = monthlyProjection();
-  const schedule = upcomingSchedule();
   const etbBreakdown = useMemo(
     () => sourceRowsForPeriod(entries, "ETB", sourcePeriod),
     [entries, sourcePeriod],
@@ -395,10 +393,7 @@ export function SavingsTracker() {
         </main>
 
         <aside className="dashboard-side">
-          <section className="block">
-            <h2 className="sec">Upcoming schedule</h2>
-            <UpcomingTimeline items={schedule} />
-          </section>
+          <UpcomingSchedule />
 
           <section className="block">
             <h2 className="sec">Payday reminders</h2>

@@ -1,4 +1,5 @@
-import type { PaydayRule } from "@/types";
+import { PAYDAY_RULES } from "@/lib/rules";
+import type { PaydayRule, UpcomingItem } from "@/types";
 
 function lastDayOfMonth(year: number, month: number): number {
   return new Date(year, month + 1, 0).getDate();
@@ -55,4 +56,41 @@ export function getNextPayday(rules: PaydayRule[], from = new Date()) {
     .sort((a, b) => a.date.getTime() - b.date.getTime());
 
   return upcoming[0];
+}
+
+/** All payday occurrences in a calendar month (local time). */
+export function paydaysInMonth(year: number, month: number): UpcomingItem[] {
+  const monthStart = new Date(year, month, 1);
+  monthStart.setHours(0, 0, 0, 0);
+  const monthEnd = new Date(year, month, lastDayOfMonth(year, month));
+  monthEnd.setHours(23, 59, 59, 999);
+
+  const items: UpcomingItem[] = [];
+
+  for (const rule of PAYDAY_RULES) {
+    if (rule.freqDays) {
+      let cursor = nextOccurrence(rule, monthStart);
+      while (cursor <= monthEnd) {
+        items.push({ rule, date: new Date(cursor), days: daysUntil(cursor) });
+        cursor = new Date(cursor.getTime() + rule.freqDays * 86_400_000);
+      }
+      continue;
+    }
+
+    if (rule.freqMonthly === "end") {
+      const date = new Date(year, month, lastDayOfMonth(year, month));
+      items.push({ rule, date, days: daysUntil(date) });
+      continue;
+    }
+
+    if (typeof rule.freqMonthly === "number") {
+      const last = lastDayOfMonth(year, month);
+      if (rule.freqMonthly <= last) {
+        const date = new Date(year, month, rule.freqMonthly);
+        items.push({ rule, date, days: daysUntil(date) });
+      }
+    }
+  }
+
+  return items.sort((a, b) => a.date.getTime() - b.date.getTime());
 }
