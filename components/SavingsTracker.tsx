@@ -15,8 +15,10 @@ import { OpeningBalanceModal } from "@/components/OpeningBalanceModal";
 import { SourceBreakdown } from "@/components/SourceBreakdown";
 import { Toast } from "@/components/Toast";
 import { UpcomingTimeline } from "@/components/UpcomingTimeline";
+import { useCloudSync } from "@/hooks/useCloudSync";
 import { useGoals } from "@/hooks/useGoals";
 import { useLedger } from "@/hooks/useLedger";
+import { syncStatusLabel } from "@/lib/sync/label";
 import { downloadCalendarFile } from "@/lib/calendar";
 import {
   entryDisplayAmount,
@@ -55,8 +57,21 @@ export function SavingsTracker() {
     undoLast,
     handleExport,
     handleImport,
+    applyRemoteState,
   } = useLedger();
-  const { goals, addGoal, addGoalObject, removeGoal } = useGoals();
+  const { goals, loaded: goalsLoaded, addGoal, addGoalObject, removeGoal, setGoals } =
+    useGoals();
+
+  const { syncStatus, syncNow } = useCloudSync({
+    ready: loaded && goalsLoaded,
+    entries,
+    goals,
+    openingDone,
+    onApply: (payload) => {
+      applyRemoteState(payload);
+      setGoals(payload.goals);
+    },
+  });
 
   const [modalOpen, setModalOpen] = useState(false);
   const [expenseOpen, setExpenseOpen] = useState(false);
@@ -142,6 +157,18 @@ export function SavingsTracker() {
             <span className="brand-sub">
               {entries.length} {entries.length === 1 ? "entry" : "entries"} in ledger
             </span>
+            {syncStatusLabel(syncStatus) && (
+              <button
+                type="button"
+                className={`sync-status sync-${syncStatus}`}
+                onClick={() => {
+                  if (syncStatus === "error" || syncStatus === "offline") void syncNow();
+                }}
+                disabled={syncStatus === "syncing" || syncStatus === "disabled"}
+              >
+                {syncStatusLabel(syncStatus)}
+              </button>
+            )}
           </div>
         </div>
         <button

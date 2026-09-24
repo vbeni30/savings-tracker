@@ -11,6 +11,7 @@ import {
   saveLedger,
 } from "@/lib/storage";
 import type { Balances, Currency, LedgerEntry, PaydayRule, Pool } from "@/types";
+import type { SyncPayload } from "@/types/sync";
 
 function createPaydayEntry(rule: PaydayRule): LedgerEntry {
   return {
@@ -193,6 +194,15 @@ export function useLedger() {
     setOpeningDone(true);
   }, []);
 
+  const applyRemoteState = useCallback((payload: SyncPayload) => {
+    setEntries(payload.ledger);
+    saveLedger(payload.ledger);
+    if (payload.openingDone) {
+      markOpeningBalanceSetup();
+      setOpeningDone(true);
+    }
+  }, []);
+
   return {
     entries,
     loaded,
@@ -207,5 +217,6 @@ export function useLedger() {
     undoLast,
     handleExport,
     handleImport,
+    applyRemoteState,
   };
 }

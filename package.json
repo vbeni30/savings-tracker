@@ -13,6 +13,7 @@
     "send-reminder": "node scripts/send-reminder.mjs"
   },
   "dependencies": {
+    "@vercel/blob": "^2.8.0",
     "jose": "^6.2.12",
     "next": "^15.5.3",
     "nodemailer": "^10.0.8",
