@@ -470,6 +470,21 @@ section.block {
   flex-shrink: 0;
 }
 
+.schedule-block .sec {
+  margin-bottom: 10px;
+}
+
+.filter-row.schedule-view-toggle {
+  margin-bottom: 12px;
+  width: 100%;
+}
+
+.filter-row.schedule-view-toggle .filter-btn {
+  flex: 1;
+  text-align: center;
+  min-height: 36px;
+}
+
 .next-card {
   position: relative;
   background: var(--pink);

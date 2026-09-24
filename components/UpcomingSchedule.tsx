@@ -36,25 +36,25 @@ export function UpcomingSchedule() {
   };
 
   return (
-    <section className="block">
-      <div className="sec-row sec-row-split">
-        <h2 className="sec">Upcoming schedule</h2>
-        <div className="filter-row period-toggle" role="group" aria-label="Schedule view">
-          <button
-            type="button"
-            className={`filter-btn${view === "list" ? " active" : ""}`}
-            onClick={() => setView("list")}
-          >
-            List
-          </button>
-          <button
-            type="button"
-            className={`filter-btn${view === "calendar" ? " active" : ""}`}
-            onClick={() => setView("calendar")}
-          >
-            Calendar
-          </button>
-        </div>
+    <section className="block schedule-block">
+      <h2 className="sec">Upcoming schedule</h2>
+      <div className="filter-row schedule-view-toggle" role="group" aria-label="Schedule view">
+        <button
+          type="button"
+          className={`filter-btn${view === "list" ? " active" : ""}`}
+          onClick={() => setView("list")}
+          aria-pressed={view === "list"}
+        >
+          List
+        </button>
+        <button
+          type="button"
+          className={`filter-btn${view === "calendar" ? " active" : ""}`}
+          onClick={() => setView("calendar")}
+          aria-pressed={view === "calendar"}
+        >
+          Calendar
+        </button>
       </div>
       {view === "list" ? (
         <UpcomingTimeline items={listItems} />
