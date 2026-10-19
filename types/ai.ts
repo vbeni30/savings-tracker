@@ -23,7 +23,17 @@ export type AiAction =
       currency: Currency;
       pool: Pool;
       note?: string;
-    };
+    }
+  | {
+      type: "adjust_balance";
+      amount: number;
+      currency: Currency;
+      pool: Pool;
+      direction: "add" | "subtract";
+      note?: string;
+    }
+  | { type: "undo_last" }
+  | { type: "remove_goal"; goalId: string; label: string };
 
 export type AiContextPayload = {
   balances: Balances;

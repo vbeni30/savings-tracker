@@ -58,6 +58,11 @@ export function mergeSyncPayload(
   return { payload: mergeByEntryId(local, remote), appliedRemote: true };
 }
 
+/** Merge ledger entries by id; union goals; latest updatedAt. */
+export function combineSyncPayloads(a: SyncPayload, b: SyncPayload): SyncPayload {
+  return mergeByEntryId(a, b);
+}
+
 function mergeByEntryId(a: SyncPayload, b: SyncPayload): SyncPayload {
   const entryMap = new Map<string, SyncPayload["ledger"][number]>();
   for (const entry of [...a.ledger, ...b.ledger]) {

@@ -26,7 +26,9 @@ function parseExpenseIntent(text: string): {
   note?: string;
 } | null {
   const lower = text.toLowerCase();
-  if (!/(spent|spend|paid|expense|bought|cost)/.test(lower)) return null;
+  if (!/\b(spent|spend|paid|expense|bought|cost|deduct|subtract|minus|log)\b/.test(lower)) {
+    return null;
+  }
 
   const amountMatch = lower.match(/(\d[\d,]*)\s*(etb|birr|usd|\$)?/);
   if (!amountMatch) return null;
@@ -198,7 +200,7 @@ export function runLocalChat(request: AiChatRequest): AiChatResponse {
   }
 
   const expenseIntent = parseExpenseIntent(text);
-  if (expenseIntent && /(log|record|track|spent|spend)/.test(lower)) {
+  if (expenseIntent && /(log|record|track|spent|spend|deduct|subtract|minus|bought|paid)/.test(lower)) {
     actions.push({ type: "log_expense", ...expenseIntent });
     return {
       message: `Logged ${formatAmount(expenseIntent.amount, expenseIntent.currency)} from your ${expenseIntent.pool} pool${expenseIntent.note ? ` (${expenseIntent.note})` : ""}.`,
@@ -268,6 +270,15 @@ export function runLocalChat(request: AiChatRequest): AiChatResponse {
     const days = daysUntil(next.date);
     return {
       message: `${next.rule.who} is next — ${formatWhenLabel(days, next.date)}. Save ${formatAmount(next.rule.save, next.rule.currency)}, keep ${formatAmount(next.rule.keep, next.rule.currency)}.`,
+      actions,
+      source: "local",
+    };
+  }
+
+  if (/(undo|revert|remove last|delete last)/.test(lower)) {
+    actions.push({ type: "undo_last" });
+    return {
+      message: "Removed the most recent ledger entry.",
       actions,
       source: "local",
     };

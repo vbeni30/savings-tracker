@@ -1,6 +1,9 @@
 import { BACKUP_DISMISS_DAYS, BACKUP_REMINDER_DAYS } from "@/lib/constants";
 import { migrateLegacyEntries } from "@/lib/ledger";
+import { validateLedgerBackup } from "@/lib/sync/validate";
 import type { LedgerEntry, SavingsEntry } from "@/types";
+
+const MAX_IMPORT_BYTES = 4 * 1024 * 1024;
 
 const LEDGER_KEY = "savings-tracker-ledger";
 const LEGACY_ENTRIES_KEY = "savings-tracker-entries";
@@ -105,10 +108,22 @@ export function exportLedger(entries: LedgerEntry[]): void {
 
 export function importLedger(file: File): Promise<LedgerEntry[]> {
   return file.text().then((text) => {
-    const parsed = JSON.parse(text) as LedgerEntry[];
-    if (!Array.isArray(parsed)) {
+    if (text.length > MAX_IMPORT_BYTES) {
+      throw new Error("Backup file is too large.");
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text) as unknown;
+    } catch {
       throw new Error("Invalid backup file.");
     }
-    return parsed;
+
+    const ledger = validateLedgerBackup(parsed);
+    if (!ledger) {
+      throw new Error("Backup file failed validation — check entry shape and limits.");
+    }
+
+    return ledger;
   });
 }

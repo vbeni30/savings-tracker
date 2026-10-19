@@ -29,7 +29,7 @@ export function buildContextBlock(context: AiContextPayload): string {
 
   const goals = context.goals.length
     ? context.goals
-        .map((g) => `- ${g.label}: ${formatAmount(g.target, g.currency)} target`)
+        .map((g) => `- id=${g.id} | ${g.label}: ${formatAmount(g.target, g.currency)} target`)
         .join("\n")
     : "- none set";
 

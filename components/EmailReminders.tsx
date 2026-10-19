@@ -4,14 +4,12 @@ import { useState } from "react";
 import { Icon } from "@/components/Icons";
 import { buildReminderEmailText, buildReminderSubject } from "@/lib/reminder-email";
 
-const DEFAULT_EMAIL = "abenidemiss300@gmail.com";
-
 type EmailRemindersProps = {
   onToast: (message: string) => void;
 };
 
 export function EmailReminders({ onToast }: EmailRemindersProps) {
-  const [email, setEmail] = useState(DEFAULT_EMAIL);
+  const [email, setEmail] = useState("");
   const [sending, setSending] = useState(false);
 
   const openMailClientFallback = () => {
@@ -26,13 +24,14 @@ export function EmailReminders({ onToast }: EmailRemindersProps) {
     try {
       const response = await fetch("/api/reminders/send", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        credentials: "include",
       });
       const data = (await response.json()) as { ok: boolean; error?: string; provider?: string };
 
       if (data.ok) {
-        onToast(`Reminder email sent to ${email}`);
+        const sentTo = "email" in data && typeof data.email === "string" ? data.email : email;
+        if (sentTo) setEmail(sentTo);
+        onToast(`Reminder email sent${sentTo ? ` to ${sentTo}` : ""}`);
         return;
       }
 

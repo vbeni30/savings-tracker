@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { acquireBodyScrollLock } from "@/lib/body-scroll-lock";
 
 type MobileMoreSheetProps = {
   open: boolean;
@@ -19,11 +20,15 @@ export function MobileMoreSheet({
 }: MobileMoreSheetProps) {
   useEffect(() => {
     if (!open) return;
+    const releaseScroll = acquireBodyScrollLock("sheet-open");
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    return () => {
+      releaseScroll();
+      window.removeEventListener("keydown", onKeyDown);
+    };
   }, [open, onClose]);
 
   if (!open) return null;

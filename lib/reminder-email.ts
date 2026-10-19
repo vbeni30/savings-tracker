@@ -72,3 +72,84 @@ export function buildReminderSubject(): string {
   const next = upcomingSchedule()[0];
   return `Payday reminder — ${next.rule.who} ${formatWhenLabel(next.days, next.date)}`;
 }
+
+export function buildDayBeforeReminderHtml(
+  items: ReturnType<typeof upcomingSchedule>,
+): string {
+  const rows = items
+    .map(
+      ({ rule, date }) => `
+        <li style="margin:0 0 8px;">
+          <strong>${rule.who}</strong> — save ${formatAmount(rule.save, rule.currency)} (${formatDate(date)})
+        </li>`,
+    )
+    .join("");
+
+  return `<!DOCTYPE html>
+<html><body style="font-family:Arial,sans-serif;padding:24px;">
+  <h1 style="font-size:20px;">Payday tomorrow</h1>
+  <p>Remember to log your payday and move savings first:</p>
+  <ul style="padding-left:20px;">${rows}</ul>
+</body></html>`;
+}
+
+export function buildDayBeforeReminderText(
+  items: ReturnType<typeof upcomingSchedule>,
+): string {
+  const lines = items.map(
+    ({ rule, date }) =>
+      `- ${rule.who}: save ${formatAmount(rule.save, rule.currency)} on ${formatDate(date)}`,
+  );
+  return ["Payday tomorrow — Savings Tracker", "", ...lines, "", "Save first. Spend what's left."].join(
+    "\n",
+  );
+}
+
+export function buildDayBeforeSubject(
+  items: ReturnType<typeof upcomingSchedule>,
+): string {
+  if (items.length === 1) {
+    return `Tomorrow: ${items[0].rule.who} payday`;
+  }
+  return `Tomorrow: ${items.length} paydays`;
+}
+
+export function buildWeeklyDigestHtml(): string {
+  const schedule = upcomingSchedule().filter((item) => item.days <= 7);
+  const rows = schedule
+    .map(
+      ({ rule, date, days }) => `
+        <tr>
+          <td style="padding:8px 0;border-bottom:1px solid #eee;font-weight:700;">${rule.who}</td>
+          <td style="padding:8px 0;border-bottom:1px solid #eee;">${formatWhenLabel(days, date)}</td>
+          <td style="padding:8px 0;border-bottom:1px solid #eee;font-family:monospace;">${formatAmount(rule.save, rule.currency)}</td>
+        </tr>`,
+    )
+    .join("");
+
+  return `<!DOCTYPE html>
+<html><body style="font-family:Arial,sans-serif;padding:24px;">
+  <h1 style="font-size:20px;">Your week of paydays</h1>
+  <p>Next 7 days on your Savings Tracker schedule:</p>
+  <table style="width:100%;border-collapse:collapse;font-size:14px;">
+    <tbody>${rows || "<tr><td>No paydays in the next 7 days.</td></tr>"}</tbody>
+  </table>
+</body></html>`;
+}
+
+export function buildWeeklyDigestText(): string {
+  const schedule = upcomingSchedule().filter((item) => item.days <= 7);
+  const lines = schedule.map(
+    ({ rule, date, days }) =>
+      `- ${rule.who}: ${formatWhenLabel(days, date)} · ${formatAmount(rule.save, rule.currency)}`,
+  );
+  return [
+    "Weekly payday digest — Savings Tracker",
+    "",
+    ...(lines.length ? lines : ["No paydays in the next 7 days."]),
+  ].join("\n");
+}
+
+export function buildWeeklyDigestSubject(): string {
+  return "Weekly payday digest — Savings Tracker";
+}

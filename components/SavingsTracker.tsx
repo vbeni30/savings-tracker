@@ -9,16 +9,26 @@ import { Icon } from "@/components/Icons";
 import { InstallButton, InstallPrompt, resetInstallDismissal } from "@/components/InstallPrompt";
 import { EmailReminders } from "@/components/EmailReminders";
 import { LogModal } from "@/components/LogModal";
-import { MobileBottomBar } from "@/components/MobileBottomBar";
+import { MobileAppNav, type MobileTabId } from "@/components/MobileAppNav";
+import { appPageClass } from "@/lib/mobile-tab";
 import { MobileMoreSheet } from "@/components/MobileMoreSheet";
 import { OpeningBalanceModal } from "@/components/OpeningBalanceModal";
 import { SourceBreakdown } from "@/components/SourceBreakdown";
 import { Toast } from "@/components/Toast";
+import { CloudSyncPanel } from "@/components/CloudSyncPanel";
+import { EmptyLedgerOnboarding } from "@/components/EmptyLedgerOnboarding";
+import { FxRatesSection } from "@/components/FxRatesSection";
+import { MonthlyRecapCard } from "@/components/MonthlyRecapCard";
+import { RunwayBanner } from "@/components/RunwayBanner";
+import { SyncConflictModal } from "@/components/SyncConflictModal";
 import { UpcomingSchedule } from "@/components/UpcomingSchedule";
+import { useAiCoachChat } from "@/hooks/useAiCoachChat";
 import { useCloudSync } from "@/hooks/useCloudSync";
 import { useGoals } from "@/hooks/useGoals";
 import { useLedger } from "@/hooks/useLedger";
-import { syncStatusLabel } from "@/lib/sync/label";
+import { buildMonthlyRecap } from "@/lib/monthly-recap";
+import { computeRunway } from "@/lib/runway";
+import { syncStatusDetail, syncStatusLabel } from "@/lib/sync/label";
 import { downloadCalendarFile } from "@/lib/calendar";
 import {
   entryDisplayAmount,
@@ -37,7 +47,7 @@ import {
   hasLoggedPaydays,
   sourceRowsForPeriod,
 } from "@/lib/stats";
-import type { Currency, PaydayRule, SourcePeriod } from "@/types";
+import type { Currency, PaydayRule, Pool, SourcePeriod } from "@/types";
 
 type HistoryFilter = "all" | Currency;
 
@@ -61,7 +71,14 @@ export function SavingsTracker() {
   const { goals, loaded: goalsLoaded, addGoal, addGoalObject, removeGoal, setGoals } =
     useGoals();
 
-  const { syncStatus, syncNow } = useCloudSync({
+  const {
+    syncStatus,
+    syncNow,
+    lastSyncedAt,
+    syncEnabled,
+    conflict,
+    resolveConflict,
+  } = useCloudSync({
     ready: loaded && goalsLoaded,
     entries,
     goals,
@@ -79,6 +96,15 @@ export function SavingsTracker() {
   const [aiOpen, setAiOpen] = useState(false);
   const [installOpen, setInstallOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [mobileTab, setMobileTab] = useState<MobileTabId>("home");
+
+  const selectMobileTab = (tab: MobileTabId) => {
+    setMobileTab(tab);
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+  const aiChat = useAiCoachChat();
   const [toast, setToast] = useState<string | null>(null);
   const [historyFilter, setHistoryFilter] = useState<HistoryFilter>("all");
   const [sourcePeriod, setSourcePeriod] = useState<SourcePeriod>("all");
@@ -104,8 +130,19 @@ export function SavingsTracker() {
   const hasPaydayLogs = useMemo(() => hasLoggedPaydays(entries), [entries]);
   const showEtbBreakdown = etbBreakdown.length > 0;
   const showUsdBreakdown = usdBreakdown.length > 0;
+  const monthlyRecap = useMemo(() => buildMonthlyRecap(entries), [entries]);
+  const runwayEtb = useMemo(
+    () => computeRunway(entries, "ETB", balances.spendable.etb),
+    [entries, balances.spendable.etb],
+  );
+  const runwayUsd = useMemo(
+    () => computeRunway(entries, "USD", balances.spendable.usd),
+    [entries, balances.spendable.usd],
+  );
 
   const showOpeningWizard = loaded && !openingDone;
+  const showEmptyOnboarding = openingDone && entries.length === 0;
+  const syncDetail = syncStatusDetail(syncStatus, lastSyncedAt);
 
   const handleLog = (rule: PaydayRule) => {
     logPayday(rule);
@@ -130,21 +167,63 @@ export function SavingsTracker() {
     try {
       await handleImport(file);
       setToast("History backup restored");
-    } catch {
-      setToast("Could not read backup file");
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Could not read backup file");
     }
+  };
+
+  const coachChatProps = {
+    entries,
+    balances,
+    goals,
+    onLogPayday: handleLog,
+    onLogExpense: (params: {
+      amount: number;
+      currency: Currency;
+      pool: Pool;
+      note?: string;
+    }) => {
+      logExpense(params);
+      setToast(
+        `Expense logged — ${formatAmount(params.amount, params.currency)} from ${params.pool}`,
+      );
+    },
+    onAddGoal: addGoal,
+    onAddGoalObject: addGoalObject,
+    onRemoveGoal: removeGoal,
+    onAdjustBalance: (params: {
+      amount: number;
+      currency: Currency;
+      pool: Pool;
+      direction: "add" | "subtract";
+      note?: string;
+    }) => {
+      adjustBalance(params);
+      setToast(
+        `${params.direction === "add" ? "Added" : "Deducted"} ${formatAmount(params.amount, params.currency)} ${params.direction === "add" ? "to" : "from"} ${params.pool}`,
+      );
+    },
+    onUndoLast: () => {
+      undoLast();
+      setToast("Last ledger entry removed");
+    },
+    onToast: setToast,
+    messages: aiChat.messages,
+    setMessages: aiChat.setMessages,
+    pendingActions: aiChat.pendingActions,
+    setPendingActions: aiChat.setPendingActions,
   };
 
   if (!loaded) {
     return (
-      <div className="wrap">
+      <div className="wrap app-shell">
         <div className="loading">Loading…</div>
       </div>
     );
   }
 
   return (
-    <div className="wrap">
+    <div className={`wrap app-shell${mobileTab === "coach" ? " coach-tab-active" : ""}`}>
       <header className="topbar">
         <div className="brand">
           <div className="icon-btn" aria-hidden="true">
@@ -163,8 +242,12 @@ export function SavingsTracker() {
                   if (syncStatus === "error" || syncStatus === "offline") void syncNow();
                 }}
                 disabled={syncStatus === "syncing" || syncStatus === "disabled"}
+                title={syncDetail ?? undefined}
               >
                 {syncStatusLabel(syncStatus)}
+                {syncDetail && (syncStatus === "synced" || syncStatus === "disabled") && (
+                  <span className="sync-status-sub">{syncDetail}</span>
+                )}
               </button>
             )}
           </div>
@@ -207,24 +290,48 @@ export function SavingsTracker() {
         </div>
       </header>
 
-      <AppAlerts
-        entryCount={entries.length}
-        spendableEtb={balances.spendable.etb}
-        onExport={() => {
-          handleExport();
-          setToast("Backup exported — keep the JSON file somewhere safe");
-        }}
-      />
+      <div className="desktop-only">
+        <AppAlerts
+          entryCount={entries.length}
+          spendableEtb={balances.spendable.etb}
+          onExport={() => {
+            handleExport();
+            setToast("Backup exported — keep the JSON file somewhere safe");
+          }}
+        />
+      </div>
 
       <div className="dashboard">
         <main className="dashboard-main">
-          <h1 className="hero">
-            Save first.
-            <br />
-            Spend what&apos;s left.
-          </h1>
+          <div className={appPageClass("home", mobileTab)}>
+            <div className="mobile-only mobile-only-block">
+              <AppAlerts
+                entryCount={entries.length}
+                spendableEtb={balances.spendable.etb}
+                onExport={() => {
+                  handleExport();
+                  setToast("Backup exported — keep the JSON file somewhere safe");
+                }}
+              />
+            </div>
 
-          <div className="stat-row">
+            <h1 className="hero">
+              Save first.
+              <br />
+              Spend what&apos;s left.
+            </h1>
+
+            {showEmptyOnboarding && (
+              <EmptyLedgerOnboarding
+                onOpeningBalances={() => setOpeningOpen(true)}
+                onImport={handleImportClick}
+                onLogPayday={() => setModalOpen(true)}
+              />
+            )}
+
+            <CloudSyncPanel syncEnabled={syncEnabled} />
+
+            <div className="stat-row">
             <div className="stat-card etb">
               <div className="tab" />
               <div className="stat-label-row">
@@ -274,9 +381,19 @@ export function SavingsTracker() {
               <p className="amount mono">{formatPercent(overallSavingsRate())}</p>
               <p className="stat-meta">across planned income</p>
             </div>
-          </div>
+            </div>
 
-          <section className="block">
+            <div className="mobile-quick-actions mobile-only">
+              <button type="button" className="mobile-bar-btn secondary" onClick={() => setExpenseOpen(true)}>
+                Expense
+              </button>
+              <button type="button" className="mobile-bar-btn primary" onClick={() => setModalOpen(true)}>
+                <Icon name="plus" />
+                Log payday
+              </button>
+            </div>
+
+            <section className="block">
             <h2 className="sec">Next payday</h2>
             <div className="next-card">
               <div className="tab" />
@@ -344,66 +461,74 @@ export function SavingsTracker() {
               })}
             </div>
           </section>
+          </div>
 
-          {hasPaydayLogs && (showEtbBreakdown || showUsdBreakdown) && (
-            <section className="block">
-              <div className="sec-row sec-row-split">
-                <div className="sec-row-left">
-                  <h2 className="sec">Savings by employer</h2>
-                  <p className="sec-hint">
-                    How much each payday (Land and Sea, MMCY, Sentrama) added to savings
-                  </p>
+          <div className={appPageClass("insights", mobileTab)}>
+            <h1 className="hero mobile-page-title">Insights</h1>
+            <FxRatesSection savedUsd={balances.saved.usd} spendableUsd={balances.spendable.usd} />
+            <RunwayBanner etb={runwayEtb} usd={runwayUsd} />
+            <MonthlyRecapCard recap={monthlyRecap} />
+            {hasPaydayLogs && (showEtbBreakdown || showUsdBreakdown) && (
+              <section className="block">
+                <div className="sec-row sec-row-split">
+                  <div className="sec-row-left">
+                    <h2 className="sec">Savings by employer</h2>
+                    <p className="sec-hint">
+                      How much each payday (Land and Sea, MMCY, Sentrama) added to savings
+                    </p>
+                  </div>
+                  <div className="filter-row period-toggle" role="group" aria-label="Employer totals period">
+                    {(["all", "month"] as const).map((value) => (
+                      <button
+                        key={value}
+                        type="button"
+                        className={`filter-btn${sourcePeriod === value ? " active" : ""}`}
+                        onClick={() => setSourcePeriod(value)}
+                      >
+                        {value === "all" ? "All time" : "This month"}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className="filter-row period-toggle" role="group" aria-label="Employer totals period">
-                  {(["all", "month"] as const).map((value) => (
-                    <button
-                      key={value}
-                      type="button"
-                      className={`filter-btn${sourcePeriod === value ? " active" : ""}`}
-                      onClick={() => setSourcePeriod(value)}
-                    >
-                      {value === "all" ? "All time" : "This month"}
-                    </button>
-                  ))}
+                {sourcePeriod === "month" && (
+                  <p className="period-note mono">{monthLabel}</p>
+                )}
+                <div className="breakdown-card">
+                  {showEtbBreakdown && (
+                    <SourceBreakdown
+                      title="Birr employers"
+                      rows={etbBreakdown}
+                      period={sourcePeriod}
+                      monthLabel={monthLabel}
+                    />
+                  )}
+                  {showUsdBreakdown && (
+                    <SourceBreakdown
+                      title="Dollar employers"
+                      rows={usdBreakdown}
+                      period={sourcePeriod}
+                      monthLabel={monthLabel}
+                    />
+                  )}
                 </div>
-              </div>
-              {sourcePeriod === "month" && (
-                <p className="period-note mono">{monthLabel}</p>
-              )}
-              <div className="breakdown-card">
-                {showEtbBreakdown && (
-                  <SourceBreakdown
-                    title="Birr employers"
-                    rows={etbBreakdown}
-                    period={sourcePeriod}
-                    monthLabel={monthLabel}
-                  />
-                )}
-                {showUsdBreakdown && (
-                  <SourceBreakdown
-                    title="Dollar employers"
-                    rows={usdBreakdown}
-                    period={sourcePeriod}
-                    monthLabel={monthLabel}
-                  />
-                )}
-              </div>
-            </section>
-          )}
+              </section>
+            )}
+          </div>
         </main>
 
         <aside className="dashboard-side">
-          <UpcomingSchedule />
+          <div className={appPageClass("plan", mobileTab)}>
+            <h1 className="hero mobile-page-title">Plan</h1>
+            <UpcomingSchedule />
 
           <section className="block">
             <h2 className="sec">Payday reminders</h2>
             <EmailReminders onToast={setToast} />
             <div className="remind-card remind-card-spaced">
               <p className="desc">
-                This page can&apos;t send push notifications on its own — it only checks in when you
-                open it. For a real alert on your phone, download the calendar file below and add it
-                to your Calendar app. It sets up all four paydays as recurring events with a
-                reminder.
+                Automatic emails run daily on the server when configured: a weekly digest on
+                Mondays and a reminder the day before each payday. You can still send a one-off
+                email above, or download the calendar file for phone alerts.
               </p>
               <button type="button" className="ics-btn" onClick={handleCalendarDownload}>
                 <Icon name="bell" />
@@ -411,7 +536,10 @@ export function SavingsTracker() {
               </button>
             </div>
           </section>
+          </div>
 
+          <div className={appPageClass("history", mobileTab)}>
+            <h1 className="hero mobile-page-title">Ledger</h1>
           <section className="block">
             <div className="sec-row">
               <h2 className="sec">History</h2>
@@ -503,7 +631,19 @@ export function SavingsTracker() {
               </div>
             )}
           </section>
+          </div>
         </aside>
+
+        <div className={appPageClass("coach", mobileTab)}>
+          {mobileTab === "coach" && (
+            <AiCoachPanel
+              mode="page"
+              open
+              onClose={() => selectMobileTab("home")}
+              {...coachChatProps}
+            />
+          )}
+        </div>
       </div>
 
       <InstallPrompt forceShow={installOpen} />
@@ -547,10 +687,7 @@ export function SavingsTracker() {
           }}
         />
       )}
-      <MobileBottomBar
-        onLogPayday={() => setModalOpen(true)}
-        onExpense={() => setExpenseOpen(true)}
-      />
+      <MobileAppNav active={mobileTab} onSelect={selectMobileTab} />
       <MobileMoreSheet
         open={moreOpen}
         onClose={() => setMoreOpen(false)}
@@ -564,26 +701,24 @@ export function SavingsTracker() {
           window.location.href = "/login";
         }}
       />
+      {conflict && (
+        <SyncConflictModal
+          conflict={conflict}
+          onResolve={(mode) => void resolveConflict(mode)}
+        />
+      )}
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
-      <AiCoachFab onOpen={() => setAiOpen(true)} />
-      <AiCoachPanel
-        open={aiOpen}
-        onClose={() => setAiOpen(false)}
-        entries={entries}
-        balances={balances}
-        goals={goals}
-        onLogPayday={handleLog}
-        onLogExpense={(params) => {
-          logExpense(params);
-          setToast(
-            `Expense logged — ${formatAmount(params.amount, params.currency)} from ${params.pool}`,
-          );
-        }}
-        onAddGoal={addGoal}
-        onAddGoalObject={addGoalObject}
-        onRemoveGoal={removeGoal}
-        onToast={setToast}
-      />
+      <div className="desktop-only">
+        <AiCoachFab onOpen={() => setAiOpen(true)} />
+      </div>
+      {aiOpen && (
+        <AiCoachPanel
+          mode="modal"
+          open
+          onClose={() => setAiOpen(false)}
+          {...coachChatProps}
+        />
+      )}
     </div>
   );
 }

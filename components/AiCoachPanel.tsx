@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { Icon } from "@/components/Icons";
+import { acquireBodyScrollLock } from "@/lib/body-scroll-lock";
 import { formatAmount } from "@/lib/format";
 import { PAYDAY_RULES } from "@/lib/rules";
 import { monthlyProjection, overallSavingsRate } from "@/lib/stats";
@@ -13,6 +14,7 @@ type TabId = "chat" | "summary" | "goals" | "insights";
 
 type AiCoachPanelProps = {
   open: boolean;
+  mode?: "modal" | "page";
   onClose: () => void;
   entries: LedgerEntry[];
   balances: Balances;
@@ -27,18 +29,53 @@ type AiCoachPanelProps = {
   onAddGoal: (label: string, target: number, currency: SavingsGoal["currency"]) => void;
   onAddGoalObject: (goal: SavingsGoal) => void;
   onRemoveGoal: (id: string) => void;
+  onAdjustBalance: (params: {
+    amount: number;
+    currency: Currency;
+    pool: Pool;
+    direction: "add" | "subtract";
+    note?: string;
+  }) => void;
+  onUndoLast: () => void;
   onToast: (message: string) => void;
+  messages: AiChatMessage[];
+  setMessages: Dispatch<SetStateAction<AiChatMessage[]>>;
+  pendingActions: AiAction[] | null;
+  setPendingActions: Dispatch<SetStateAction<AiAction[] | null>>;
 };
 
 const QUICK_PROMPTS = [
-  "Give me a savings summary",
   "MMCY paid today",
-  "Log 3,000 ETB groceries from spendable",
-  "Can I spend 5,000 ETB this week?",
+  "Deduct 2,500 ETB for groceries",
+  "Can I spend 5,000 ETB?",
+  "Undo my last entry",
 ];
+
+function isDestructiveAction(action: AiAction): boolean {
+  return (
+    action.type === "undo_last" ||
+    action.type === "remove_goal" ||
+    (action.type === "adjust_balance" && action.direction === "subtract")
+  );
+}
+
+function describePendingActions(actions: AiAction[]): string {
+  const parts: string[] = [];
+  for (const action of actions) {
+    if (action.type === "undo_last") parts.push("undo your last ledger entry");
+    if (action.type === "remove_goal") parts.push(`remove goal “${action.label}”`);
+    if (action.type === "adjust_balance" && action.direction === "subtract") {
+      parts.push(
+        `subtract ${formatAmount(action.amount, action.currency)} from ${action.pool}`,
+      );
+    }
+  }
+  return parts.join("; ");
+}
 
 export function AiCoachPanel({
   open,
+  mode = "modal",
   onClose,
   entries,
   balances,
@@ -48,19 +85,18 @@ export function AiCoachPanel({
   onAddGoal,
   onAddGoalObject,
   onRemoveGoal,
+  onAdjustBalance,
+  onUndoLast,
   onToast,
+  messages,
+  setMessages,
+  pendingActions,
+  setPendingActions,
 }: AiCoachPanelProps) {
   const [tab, setTab] = useState<TabId>("chat");
-  const [messages, setMessages] = useState<AiChatMessage[]>([
-    {
-      id: "welcome",
-      role: "assistant",
-      content:
-        "Hi — I'm your savings coach. Log paydays in plain English, run what-if scenarios, set goals, or ask for summaries and tips.",
-    },
-  ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [engine, setEngine] = useState<"openai" | "local" | null>(null);
   const [summary, setSummary] = useState("");
   const [suggestions, setSuggestions] = useState("");
   const [reminder, setReminder] = useState("");
@@ -68,6 +104,16 @@ export function AiCoachPanel({
   const [goalTarget, setGoalTarget] = useState("50000");
   const [goalCurrency, setGoalCurrency] = useState<SavingsGoal["currency"]>("ETB");
   const listRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open || mode === "page") return;
+    return acquireBodyScrollLock("coach-open");
+  }, [open, mode]);
+
+  useEffect(() => {
+    if (!open) return;
+    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages, loading, open]);
 
   const context = useMemo<AiContextPayload>(
     () => ({
@@ -80,24 +126,52 @@ export function AiCoachPanel({
     [balances, entries, goals],
   );
 
+  const applyOneAction = (action: AiAction) => {
+    if (action.type === "log_payday") {
+      const rule = PAYDAY_RULES.find((item) => item.id === action.ruleId);
+      if (rule) onLogPayday(rule);
+    }
+    if (action.type === "log_expense") {
+      onLogExpense({
+        amount: action.amount,
+        currency: action.currency,
+        pool: action.pool,
+        note: action.note,
+      });
+    }
+    if (action.type === "set_goal") {
+      onAddGoalObject(action.goal);
+    }
+    if (action.type === "adjust_balance") {
+      onAdjustBalance({
+        amount: action.amount,
+        currency: action.currency,
+        pool: action.pool,
+        direction: action.direction,
+        note: action.note,
+      });
+    }
+    if (action.type === "undo_last") {
+      onUndoLast();
+    }
+    if (action.type === "remove_goal") {
+      onRemoveGoal(action.goalId);
+    }
+  };
+
   const applyActions = (actions: AiAction[]) => {
     for (const action of actions) {
-      if (action.type === "log_payday") {
-        const rule = PAYDAY_RULES.find((item) => item.id === action.ruleId);
-        if (rule) onLogPayday(rule);
-      }
-      if (action.type === "log_expense") {
-        onLogExpense({
-          amount: action.amount,
-          currency: action.currency,
-          pool: action.pool,
-          note: action.note,
-        });
-      }
-      if (action.type === "set_goal") {
-        onAddGoalObject(action.goal);
-      }
+      applyOneAction(action);
     }
+  };
+
+  const confirmPendingActions = () => {
+    if (!pendingActions?.length) return;
+    applyActions(pendingActions);
+    onToast(
+      `Confirmed — ${pendingActions.length} sensitive update${pendingActions.length === 1 ? "" : "s"} applied`,
+    );
+    setPendingActions(null);
   };
 
   const callAi = async (
@@ -137,16 +211,25 @@ export function AiCoachPanel({
 
     try {
       const result = await callAi("chat", nextMessages.map(({ role, content }) => ({ role, content })));
-      applyActions(result.actions);
+      setEngine(result.source);
+      const safe = result.actions.filter((action) => !isDestructiveAction(action));
+      const sensitive = result.actions.filter(isDestructiveAction);
+      if (safe.length > 0) applyActions(safe);
+      if (sensitive.length > 0) {
+        setPendingActions(sensitive);
+      } else {
+        setPendingActions(null);
+      }
+      const suffix =
+        sensitive.length > 0
+          ? " Confirm the sensitive changes below before they are applied."
+          : "";
       setMessages((current) => [
         ...current,
-        { id: crypto.randomUUID(), role: "assistant", content: result.message },
+        { id: crypto.randomUUID(), role: "assistant", content: `${result.message}${suffix}`.trim() },
       ]);
-      if (result.actions.some((action) => action.type === "log_payday")) {
-        onToast("Payday logged via AI coach");
-      }
-      if (result.actions.some((action) => action.type === "log_expense")) {
-        onToast("Expense logged via AI coach");
+      if (safe.length > 0) {
+        onToast(`Done — ${safe.length} update${safe.length === 1 ? "" : "s"} applied`);
       }
     } catch {
       onToast("Could not reach AI coach");
@@ -182,19 +265,37 @@ export function AiCoachPanel({
     return Math.min(100, Math.round((saved / goal.target) * 100));
   };
 
-  if (!open) return null;
+  if (mode === "modal" && !open) return null;
+  if (mode === "page" && !open) return null;
 
-  return (
-    <div className="ai-backdrop" onClick={(event) => event.target === event.currentTarget && onClose()}>
-      <aside className="ai-panel" role="dialog" aria-modal="true" aria-label="AI savings coach">
+  const panel = (
+      <aside
+        className={`ai-panel${mode === "page" ? " ai-panel-page" : ""}`}
+        role={mode === "modal" ? "dialog" : "region"}
+        aria-modal={mode === "modal" ? true : undefined}
+        aria-label="AI savings coach"
+      >
+        {mode === "modal" && <div className="ai-sheet-handle" aria-hidden="true" />}
         <header className="ai-header">
-          <div>
+          {mode === "modal" && (
+            <button type="button" className="ai-back-btn" onClick={onClose} aria-label="Close AI coach">
+              ← Back
+            </button>
+          )}
+          <div className="ai-header-main">
             <p className="ai-kicker">AI COACH</p>
             <h2>Savings assistant</h2>
+            {engine && (
+              <p className="ai-engine-tag">
+                {engine === "openai" ? "OpenAI" : "Built-in rules"}
+              </p>
+            )}
           </div>
-          <button type="button" className="ai-close" onClick={onClose} aria-label="Close AI coach">
-            ×
-          </button>
+          {mode === "modal" && (
+            <button type="button" className="ai-close" onClick={onClose} aria-label="Close AI coach">
+              ×
+            </button>
+          )}
         </header>
 
         <div className="ai-tabs">
@@ -223,7 +324,7 @@ export function AiCoachPanel({
 
         <div className="ai-body">
           {tab === "chat" && (
-            <>
+            <div className="ai-chat-view">
               <div className="ai-messages" ref={listRef}>
                 {messages.map((message) => (
                   <div key={message.id} className={`ai-msg ${message.role}`}>
@@ -232,31 +333,55 @@ export function AiCoachPanel({
                 ))}
                 {loading && <div className="ai-msg assistant ai-typing">Thinking…</div>}
               </div>
-              <div className="ai-chips">
-                {QUICK_PROMPTS.map((prompt) => (
-                  <button key={prompt} type="button" className="ai-chip" onClick={() => sendMessage(prompt)}>
-                    {prompt}
+              <div className="ai-composer">
+                {pendingActions && pendingActions.length > 0 && (
+                  <div className="ai-confirm-bar" role="region" aria-label="Confirm sensitive changes">
+                    <p className="ai-confirm-text">
+                      Apply: {describePendingActions(pendingActions)}?
+                    </p>
+                    <div className="ai-confirm-actions">
+                      <button type="button" className="ghost-btn" onClick={() => setPendingActions(null)}>
+                        Cancel
+                      </button>
+                      <button type="button" className="ics-btn" onClick={confirmPendingActions}>
+                        Confirm
+                      </button>
+                    </div>
+                  </div>
+                )}
+                <div className="ai-chips" role="list">
+                  {QUICK_PROMPTS.map((prompt) => (
+                    <button
+                      key={prompt}
+                      type="button"
+                      className="ai-chip"
+                      onClick={() => sendMessage(prompt)}
+                    >
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
+                <form
+                  className="ai-input-row"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void sendMessage(input);
+                  }}
+                >
+                  <input
+                    value={input}
+                    onChange={(event) => setInput(event.target.value)}
+                    placeholder="Message your coach…"
+                    disabled={loading}
+                    enterKeyHint="send"
+                    autoComplete="off"
+                  />
+                  <button type="submit" className="ai-send" disabled={loading || !input.trim()}>
+                    Send
                   </button>
-                ))}
+                </form>
               </div>
-              <form
-                className="ai-input-row"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void sendMessage(input);
-                }}
-              >
-                <input
-                  value={input}
-                  onChange={(event) => setInput(event.target.value)}
-                  placeholder='Try "Sentrama paid" or "Set 50k ETB goal"'
-                  disabled={loading}
-                />
-                <button type="submit" className="ai-send" disabled={loading || !input.trim()}>
-                  Send
-                </button>
-              </form>
-            </>
+            </div>
           )}
 
           {tab === "summary" && (
@@ -340,6 +465,13 @@ export function AiCoachPanel({
           )}
         </div>
       </aside>
+  );
+
+  if (mode === "page") return panel;
+
+  return (
+    <div className="ai-backdrop" onClick={(event) => event.target === event.currentTarget && onClose()}>
+      {panel}
     </div>
   );
 }

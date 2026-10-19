@@ -46,8 +46,12 @@ export async function verifySessionToken(token: string): Promise<boolean> {
 }
 
 export async function getSessionFromCookies(): Promise<boolean> {
-  const cookieStore = await cookies();
-  const token = cookieStore.get(SESSION_COOKIE)?.value;
+  const token = await getSessionTokenFromCookies();
   if (!token) return false;
   return verifySessionToken(token);
+}
+
+export async function getSessionTokenFromCookies(): Promise<string | null> {
+  const cookieStore = await cookies();
+  return cookieStore.get(SESSION_COOKIE)?.value ?? null;
 }

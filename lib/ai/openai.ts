@@ -8,11 +8,17 @@ const SYSTEM_PROMPT = `You are the Savings Tracker AI coach. You help users save
 Rules:
 - Use ONLY the user data snapshot provided — never invent balances or dates.
 - Be concise, practical, and friendly. Use short paragraphs or bullets.
-- When the user wants to log a payday, call log_payday with the correct rule id.
-- When the user logs spending, call log_expense with amount, currency, pool (spendable for daily costs, saved only if they explicitly touch savings).
+- Interpret casual language: "deduct", "spent", "paid", "bought", "minus", "took out" -> log_expense; "got paid", "payday landed", employer names -> log_payday.
+- Default expenses to spendable pool and ETB unless the user says USD/dollars or "from savings".
+- Parse amounts with commas (e.g. 3,000). Infer a short note from context (groceries, rent, transport).
+- When the user wants to log a payday, call log_payday with the correct rule id (one call per payday).
+- When the user logs spending, call log_expense. For corrections without a purchase story, use adjust_balance.
+- undo_last only when they clearly want to revert the most recent ledger entry.
+- remove_goal uses goal id from the GOALS section of the snapshot.
 - When the user sets a savings goal, call set_goal.
 - For what-if questions, call run_what_if then explain results clearly.
-- For "can I afford" questions, use saved vs spendable balances from the snapshot — prefer spendable pool.
+- For affordability, call check_afford then answer in plain language.
+- You cannot export files or change app settings — say so if asked.
 - Amounts: ETB for birr, USD for dollars.
 - Available rule ids: lsd, mmcy, sen15, sen30.
 
@@ -67,6 +73,62 @@ const TOOLS = [
           currency: { type: "string", enum: ["ETB", "USD"] },
         },
         required: ["label", "target", "currency"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "check_afford",
+      description: "Check if user can afford an amount from spendable or saved pool",
+      parameters: {
+        type: "object",
+        properties: {
+          amount: { type: "number" },
+          currency: { type: "string", enum: ["ETB", "USD"] },
+          pool: { type: "string", enum: ["spendable", "saved"] },
+        },
+        required: ["amount", "currency", "pool"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "adjust_balance",
+      description: "Add or subtract from saved/spendable without framing as a purchase expense",
+      parameters: {
+        type: "object",
+        properties: {
+          amount: { type: "number" },
+          currency: { type: "string", enum: ["ETB", "USD"] },
+          pool: { type: "string", enum: ["saved", "spendable"] },
+          direction: { type: "string", enum: ["add", "subtract"] },
+          note: { type: "string" },
+        },
+        required: ["amount", "currency", "pool", "direction"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "undo_last",
+      description: "Remove the most recent ledger entry (undo)",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "remove_goal",
+      description: "Delete a savings goal by id from the snapshot",
+      parameters: {
+        type: "object",
+        properties: {
+          goalId: { type: "string" },
+        },
+        required: ["goalId"],
       },
     },
   },
@@ -128,7 +190,9 @@ export async function runOpenAiChat(request: AiChatRequest): Promise<AiChatRespo
   const actions: AiAction[] = [];
   let assistantText = "";
 
-  for (let step = 0; step < 3; step += 1) {
+  const useTools = !request.intent || request.intent === "chat";
+
+  for (let step = 0; step < 4; step += 1) {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -138,9 +202,9 @@ export async function runOpenAiChat(request: AiChatRequest): Promise<AiChatRespo
       body: JSON.stringify({
         model,
         messages,
-        tools: request.intent === "chat" ? TOOLS : undefined,
-        tool_choice: request.intent === "chat" ? "auto" : undefined,
-        temperature: 0.4,
+        tools: useTools ? TOOLS : undefined,
+        tool_choice: useTools ? "auto" : undefined,
+        temperature: 0.35,
       }),
     });
 
@@ -205,6 +269,43 @@ export async function runOpenAiChat(request: AiChatRequest): Promise<AiChatRespo
           const { runWhatIf } = await import("@/lib/ai/scenarios");
           const result = runWhatIf(String(args.ruleId), Number(args.newSaveAmount));
           toolResult = result ? JSON.stringify(result) : "Could not run scenario.";
+        }
+
+        if (call.function.name === "check_afford") {
+          const { canAfford } = await import("@/lib/ledger");
+          const amount = Number(args.amount);
+          const currency = args.currency as "ETB" | "USD";
+          const pool = args.pool as "saved" | "spendable";
+          const result = canAfford(request.context.balances, amount, currency, pool);
+          toolResult = JSON.stringify(result);
+        }
+
+        if (call.function.name === "adjust_balance") {
+          actions.push({
+            type: "adjust_balance",
+            amount: Number(args.amount),
+            currency: args.currency as "ETB" | "USD",
+            pool: args.pool as "saved" | "spendable",
+            direction: args.direction as "add" | "subtract",
+            note: args.note ? String(args.note) : undefined,
+          });
+          toolResult = `Adjusted ${args.direction} ${args.amount} ${args.currency} on ${args.pool}.`;
+        }
+
+        if (call.function.name === "undo_last") {
+          actions.push({ type: "undo_last" });
+          toolResult = "Undid the last ledger entry.";
+        }
+
+        if (call.function.name === "remove_goal") {
+          const goalId = String(args.goalId);
+          const goal = request.context.goals.find((item) => item.id === goalId);
+          if (goal) {
+            actions.push({ type: "remove_goal", goalId, label: goal.label });
+            toolResult = `Removed goal "${goal.label}".`;
+          } else {
+            toolResult = "Goal id not found in snapshot.";
+          }
         }
 
         messages.push({

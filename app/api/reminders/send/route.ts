@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import { getDefaultReminderEmail, sendPaydayReminder } from "@/lib/email";
 
-export async function POST(request: Request) {
+export async function POST() {
   try {
-    const body = (await request.json().catch(() => ({}))) as { email?: string };
-    const email = body.email?.trim() || getDefaultReminderEmail();
+    const email = getDefaultReminderEmail();
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return NextResponse.json({ ok: false, error: "Invalid email address." }, { status: 400 });
